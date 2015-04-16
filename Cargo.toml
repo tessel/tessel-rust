@@ -1,0 +1,9 @@
+[package]
+
+name = "tessel-rust"
+version = "0.0.1"
+authors = ["Kenneth Nierenhausen <kennethnierenhausen@gmail.com>"]
+
+[dependencies]
+
+unix_socket = "0.3.0"
