@@ -21,7 +21,7 @@ This is the outline for what’s done, what needs to be done, and what’s being
 ##### Core functionality
 | Feature | State | Link |
 |----------|-------------|------|
-| Tessel core functionality | In Progress (as needed) | https://github.com/johnnyman727/accel-mma84-rust/blob/jon-get-accel/src/tessel.rs |
+| Tessel core functionality | In Progress (as needed) | https://github.com/tessel/rust-tessel/blob/master/src/lib.rs |
 | Relay Module | Not Started |  |
 | Rust CLI Update | Not Started |  |
 | Cargo on Tessel | In Progress |  |
