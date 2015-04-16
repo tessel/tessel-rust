@@ -1,6 +1,6 @@
 [package]
 
-name = "tessel-rust"
+name = "tessel_rust"
 version = "0.0.1"
 authors = ["Kenneth Nierenhausen <kennethnierenhausen@gmail.com>"]
 
