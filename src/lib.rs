@@ -45,11 +45,28 @@ impl TesselPort {
 
     for i in actions.iter_mut() {
       // TODO - get an equivalent of read_at_least in here
-      try!(self.sock.read(i.rx));
+      try!(self.read_all(i.rx));
     }
 
     Ok(())
   }
+
+  pub fn read_all(&mut self, mut buf: &mut [u8]) -> IOResult<()> {
+    use std::io::{Error, ErrorKind};
+    let mut total = 0;
+    while total < buf.len() {
+        match self.sock.read(&mut buf[total..]) {
+            Ok(0) => return Err(Error::new(ErrorKind::Other,
+                "failed to read whole buffer",
+            )),
+            Ok(n) => total += n,
+            Err(ref e) if e.kind() == ErrorKind::Interrupted => {}
+            Err(e) => return Err(e),
+        }
+    }
+    Ok(())
+  }
+
 }
 
 pub struct Action<'a> {
