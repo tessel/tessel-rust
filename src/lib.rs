@@ -6,24 +6,29 @@ use std::io::Write;
 use std::io::Read;
 use std::path::Path;
 
-const CMD_ECHO:u8 = 2;
-// const CMD_GPIO_IN:u8 = 3;
-const CMD_GPIO_HIGH:u8 = 4;
-const CMD_GPIO_LOW:u8 = 5;
-// const CMD_GPIO_CFG: u8 = 6;
-// const CMD_GPIO_WAIT: u8 = 7;
-// const CMD_GPIO_INT: u8 = 8;
-const CMD_ENABLE_SPI: u8 = 10;
-const CMD_DISABLE_SPI: u8 = 11;
-const CMD_ENABLE_I2C: u8 = 12;
-const CMD_DISABLE_I2C: u8 = 13;
-// const CMD_ENABLE_UART: u8 = 14;
-// const CMD_DISABLE_UART: u8 = 15;
-const CMD_TX: u8 = 16;
-const CMD_RX: u8 = 17;
-const CMD_TXRX: u8 = 18;
-const CMD_START: u8 = 19;
-const CMD_STOP: u8 = 20;
+// Commands
+const CMD_ECHO:u8 =                   2;
+// const CMD_GPIO_IN:u8 =                3;
+const CMD_GPIO_HIGH:u8 =              4;
+const CMD_GPIO_LOW:u8 =               5;
+// const CMD_GPIO_CFG: u8 =              6;
+// const CMD_GPIO_WAIT: u8 =             7;
+// const CMD_GPIO_INT: u8 =              8;
+const CMD_ENABLE_SPI: u8 =            10;
+const CMD_DISABLE_SPI: u8 =           11;
+const CMD_ENABLE_I2C: u8 =            12;
+const CMD_DISABLE_I2C: u8 =           13;
+// const CMD_ENABLE_UART: u8 =           14;
+// const CMD_DISABLE_UART: u8 =          15;
+const CMD_TX: u8 =                    16;
+const CMD_RX: u8 =                    17;
+const CMD_TXRX: u8 =                  18;
+const CMD_START: u8 =                 19;
+const CMD_STOP: u8 =                  20;
+
+// UDS locations
+const USD_PORT_A: &'static str =      "/var/run/tessel/port_a";
+const USD_PORT_B: &'static str =      "/var/run/tessel/port_b";
 
 pub struct TesselPort {
   sock: UnixStream,
@@ -31,9 +36,15 @@ pub struct TesselPort {
 
 impl TesselPort {
 
-  pub fn new(p: &Path) -> TesselPort {
-    TesselPort {
-      sock: UnixStream::connect(&p).unwrap(),
+  pub fn new(p: &'static str) -> Result<TesselPort, &'static str> {
+    match p {
+      "a" | "A" => Ok(TesselPort {
+        sock: UnixStream::connect(&Path::new(USD_PORT_A)).unwrap()
+      }),
+      "b" | "B" => Ok(TesselPort {
+        sock: UnixStream::connect(&Path::new(USD_PORT_B)).unwrap()
+      }),
+      _ => Err("Invalid port selected. Please choose either \"a\" or \"b\""),
     }
   }
 

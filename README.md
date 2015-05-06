@@ -2,34 +2,32 @@
 
 Looking to do some Rust development on Tessel? You’ve found the right place.
 
-### Current State
-
-The current state of developing Rust on Tessel is outlined below. There’s plenty of work to do, but together we can make Rust on Tessel happen soon.
-
 ### The Goal
 
 The end goal of is to make it possible to control our hardware with Rust. That means taking our current API’s (in Javascript) and getting them ported over. Not only does core functionality like bus communication have to work, but all the modules as well! Fun times ahead :)
 
-### Now
+### Current State
+
+The current state of developing Rust on Tessel is outlined below. There’s plenty of work to do, but together we can make Rust on Tessel happen soon.
 
 Right now we’re working on getting the core Tessel features ported as well as the getting the Accelerometer demo working. Along with this, we’re working on making it super easy to use, so that running can be as simple as `tessel run test.rs`.
 
 ### Checklist
 
-This is the outline for what’s done, what needs to be done, and what’s being done. There are many ways to skin a cat (why is that still a phrase?), but I’m keeping it simple, and having this be the central hub for Rust development on the Tessel platform.
+This is the outline for what’s done, what needs to be done, and what’s being done. There are many ways to skin a cat (why is that still a phrase?), but I’m keeping it simple. This is the central repo for Rust on Tessel. It'll have links to all the modules devices as well.
 
 ##### Core functionality
 | Feature | State | Link |
 |----------|-------------|------|
-| Tessel core functionality | In Progress (as needed) | https://github.com/tessel/rust-tessel/blob/master/src/lib.rs |
-| Relay Module | Not Started |  |
-| Rust CLI Update | Not Started |  |
-| Cargo on Tessel | In Progress |  |
+| Tessel core functionality | In Progress (as needed) | https://github.com/tessel/rust-tessel |
+| Rust CLI Update | Not Started | https://github.com/tessel/t2-cli |
+| Cargo on Tessel | In Progress | https://github.com/tessel/rust-tessel |
 
 ##### Modules
 | Feature | State | Link |
 |----------|-------------|------|
-| Accelerometer Module | Almost Done | https://github.com/johnnyman727/accel-mma84-rust |
+| Accelerometer Module | Almost Done | https://github.com/tessel/rust-accel-mma84 |
+| Relay Module | Not Started |  |
 | Infrared Module | Not Started |  |
 | RFID Module | Not Started |  |
 | Ambient Module | Not Started |  |
@@ -53,59 +51,126 @@ Calling all Rustaceans. Up for a challenge? These are some stretch goals we woul
 
 So you want to develop some part of this yourself? Awesome! This section will help you from setup to actually running your code on a device. So let’s dive in!
 
-Note - it’s assumed you’re using `Cargo` in your repository. If you’re not sure what I mean, read more [hererere](http://doc.crates.io/#let's-get-started).
+Important! - use `Cargo` to create your repository. If you’re not sure what I mean, read more [here](http://doc.crates.io/#let's-get-started).
 
 ### Setup
 
-Setup is simply how to get everything configured in order to start developing your library. Keep in mind there are three parts here - a HOST (your machine), a VM (A machine to compile using MIPS), and a DEVICE (A MIPS device). Here’s a list of steps to run through to make get everything set up:
+Setup is simply how to get everything configured in order to start developing your library.
 
-1.	On your HOST get [Vagrant](https://www.vagrantup.com/downloads.html)
-2.	Create and change into a new directory `mkdir ~/Vagrant/rustvm`
-3.	Create your MIPS VM by running `vagrant init hashicorp/precise64`
-4.	In your `Vagrantfile` add this line `config.vm.synced_folder "<host repo dir>", "/home/vagrant/<your repo name>"` to sync your HOST repo with the VM repo.
-5.	Boot up the VM with `vagrant up`
-6.	SSH into the VM using `vagrant ssh`
-7.	On your VM, change directory into your repository
-8.	Mac: \
-8.	Linux:
-9.	Change back to your HOST terminal, and plug in your Tessel 2 & module
-10.	Clone the T2 CLI repo using `git clone https://github.com/tessel/t2-cli`
-11.	Change into that dir and run `npm link --local`
-12.	In order to see your Tessel 2 run `t2 list` and note the IP address
-13.	SSH into your T2 using `ssh root@192.168.***.***`
+Note: this section needs to be updated to use t2-vm, and also have separate setups for MAC and Linux users that forces them to build their own (gaurenteed up to date) versions of the SDK and Rust MIPS Libraries.
+
+1.	Get Rust if you don't already have it
+  ```
+  curl -s https://static.rust-lang.org/rustup.sh | sudo sh
+  ```
+
+1.	Create a new Cargo project if you don't already have one:
+  ```
+  cargo init rust-library
+  ```
+  Note: change `rust-library` to your projects name thoughout the rest of the setup
+
+1.	Get [Vagrant](https://www.vagrantup.com/downloads.html) if you don't already have it
+
+1.	After installing Vagrant, run the following to get your VM setup:
+  ```
+  mkdir ~/Vagrant/rustvm
+  cd ~/Vagrant/rustvm
+  vagrant init hashicorp/precise64
+  ```
+
+1.	This directory now contains your `Vagrantfile`. Add the following line to this file:
+  ```
+  config.vm.synced_folder "<explicit path>/rust-library", "/home/vagrant/rust-library"
+  ```
+  Make sure to replace `<explicit path>` with the full path to your cargo project
+
+1.	To bring up and connect to your VM run the following:
+  ```
+  vagrant up
+  vagrant ssh
+  ```
+  Now your MIPS VM is running. Make sure you're in your VM terminal and complete the following:
+
+1.	Change into the parent of your shared directory:
+  ```
+  cd /home/vagrant/
+  ```
+
+1.	Get the SDK:
+  ```
+  wget https://kevinmehall.net/tmp/OpenWrt-SDK-ramips-mt7620_gcc-4.8-linaro_uClibc-0.9.33.2.Linux-x86_64.tar.bz2
+  tar -xvf OpenWrt-SDK-ramips-mt7620_gcc-4.8-linaro_uClibc-0.9.33.2.Linux-x86_64.tar.bz2
+  ```
+
+1.	Get the Rust MIPS Libraries
+  ```
+  wget https://kevinmehall.net/tmp/rust-mipsel-libs-809a554fca2d0ebc2ba50077016fe282a4064752.tar.bz2
+  tar -xvf rust-mipsel-libs-809a554fca2d0ebc2ba50077016fe282a4064752.tar.bz2
+  ```
+  Note: if you're getting linker errors, build the rust libs yourself to match your current rust version
+
+1.	Set these environment variable so the toolchain knows where things are:
+  ```
+  export STAGING_DIR=/home/vagrant/OpenWrt-SDK-ramips-mt7620_gcc-4.8-linaro_uClibc-0.9.33.2.Linux-x86_64/staging_dir
+  export PATH=$PATH:$STAGING_DIR/toolchain-mipsel_24kec+dsp_gcc-4.8-linaro_uClibc-0.9.33.2/bin
+  ```
+
+1.	Get Rust on the VM
+  ```
+  sudo apt-get install curl
+  curl -s https://static.rust-lang.org/rustup.sh | sudo sh
+  ```
+
+1.	On your HOST device, in a new terminal, plug in your Tessel 2 via USB and run the following:
+  ```
+  git clone https://github.com/tessel/t2-cli
+  npm link --local
+  t2 list
+  ```
+  Now you have root access to your Tessel 2 device where you'll be able to run your program
 
 ### Routine
 
 After setup is complete this is what your story is going to look like for awhile:
 
-1.	Modify your code
-2.	Compile it on the VM
-3.	Copy the binary to the device and run it
-4.	Repeat step 1 - 3 until it’s working
-5.	Make a PR, and bask in the glory
+1.	Modify your code on HOST
+1.	Build it on the VM
+1.	Copy the binary to the Tessel and run it
+1.	Repeat step 1 - 3 until it’s working
+1.	Make a PR, and bask in the glory
 
 ### Build
 
-Building takes place on the VM in order to be compiled using the MIPS architecture. Make sure to use your VM's terminal, and complete the following:
+Building takes place on the VM in order to be compiled using the MIPS architecture. Make sure to use your VM's terminal in your main Cargo repository, and complete the following:
+```
+rustc -L ../x86_64-unknown-linux-gnu/stage2/lib/rustlib/mipsel-unknown-linux-gnu/lib --target=mipsel-unknown-linux-gnu -Ctarget-cpu=mips32r2 src/lib.rs -Clinker=mipsel-openwrt-linux-gcc -O
+```
 
-1.	Change directory into your repository
-2.	To build the code run `rustc -L ../x86_64-unknown-linux-gnu/stage2/lib/rustlib/mipsel-unknown-linux-gnu/lib --target=mipsel-unknown-linux-gnu -Ctarget-cpu=mips32r2 src/lib.rs -Clinker=mipsel-openwrt-linux-gcc -O`
+Note if you're running into compilation problems, make sure that you're actually in your Cargo repo.
 
 ### Run
 
 Running takes place on the device itself in order to see real results.
 
-1.	From your HOST machine copy over the compiled binary (in the shared folder) over to your DEVICE using `scp lib root@192.168.***.***:~`
-2.	From your Tessel 2 run your program using `./lib /var/run/tessel/port_a` in your home directory
+1.	From your HOST machine, copy the binary (in the shared folder) over to your Tessel using:
+  ```
+  scp lib root@192.168.***.***:~
+  ```
+  Note: you can get your Tessel's IP by running `t2 status`
+
+1.	From your Tessel 2 run your program using:
+  ```
+  ./lib /var/run/tessel/port_a
+  ```
 
 ### Test
 
-Testing is like building and running combined. Compiling to test your code will create a binary that runs your unit and integrated tests. To test, run the following:
-
-1.	On your VM, change into your repo directory
-2.	To build the code run `rustc -L ../x86_64-unknown-linux-gnu/stage2/lib/rustlib/mipsel-unknown-linux-gnu/lib --target=mipsel-unknown-linux-gnu -Ctarget-cpu=mips32r2 src/lib.rs -Clinker=mipsel-openwrt-linux-gcc -O --test` (note the `--test` flag)
-3.	From your HOST, copy over the compiled binary (in the shared folder) over to your DEVICE using `scp lib root@192.168.***.***:~`
-4.	From your DEVICE test your program by running `./lib` in your home directory 
+Testing is the exact same process as running. Except when you build, specify the `--test` flag: 
+```
+rustc -L ../x86_64-unknown-linux-gnu/stage2/lib/rustlib/mipsel-unknown-linux-gnu/lib --target=mipsel-unknown-linux-gnu -Ctarget-cpu=mips32r2 src/lib.rs -Clinker=mipsel-openwrt-linux-gcc -O --test
+```
+This compiles your unit tests and any integrated tests you have in your `tests` directory into a binary much like regular build did.. Simply follow the Run steps above to actually run your tests.
 
 ### Finishing
 
@@ -113,17 +178,11 @@ Wow - if you’ve finished a Rust library for the Tessel Platform, rock on - you
 
 ### Bugs
 
-Naturally there’s going to be bugs. If there’s a problem with any of the repositories then simply file an issue with steps to reproduce the bug, expected result, and actual result. Using this format will save us all a lot of time and energy. Even better, fix it yourself and submit a PR!
+Naturally there’s going to be bugs. If there’s a problem with any of the repositories then simply file an [issue](https://github.com/tessel/rust-tessel/issues) with steps to reproduce the bug, expected result, and actual result. Using this format will save us all a lot of time and energy. Better yet, fix it yourself and submit a PR!
 
 # Staying Updated
 
-Obviously, the open source nature of this is going to cause some async issues. I highly recommend you stay up to date on this repo - subscribe, see what people are working on, be active! Make sure that you’re not working on something that’s already being done!
-
-### Everybody loves email
-
-I’m considering throwing together a mailing list that I can blast when need be. I wouldn’t spam it, but it would exist to complement the ever changing state of the repo. Occasional updates that would let the subscribers know the current progress, etc.
-
-Curious as to what ya’ll think about this. It would probably be a google group. Suggestions welcome. 
+Obviously, the open source nature of this is going to cause some async issues. I highly recommend you stay up to date on this repo - subscribe, see what people are working on, be active! Make sure that you’re not working on something that’s already being done. If you are, collaborate!
 
 ### Contact
 
