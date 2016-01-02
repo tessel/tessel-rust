@@ -1,145 +1,114 @@
-extern crate unix_socket;
-use unix_socket::UnixStream;
-
-use std::io::Result as IOResult;
+use std::fs::File;
+use std::io;
 use std::io::Write;
-use std::io::Read;
-use std::path::Path;
 
-// Commands
-const CMD_ECHO:u8 =                   2;
-// const CMD_GPIO_IN:u8 =                3;
-const CMD_GPIO_HIGH:u8 =              4;
-const CMD_GPIO_LOW:u8 =               5;
-// const CMD_GPIO_CFG: u8 =              6;
-// const CMD_GPIO_WAIT: u8 =             7;
-// const CMD_GPIO_INT: u8 =              8;
-const CMD_ENABLE_SPI: u8 =            10;
-const CMD_DISABLE_SPI: u8 =           11;
-const CMD_ENABLE_I2C: u8 =            12;
-const CMD_DISABLE_I2C: u8 =           13;
-// const CMD_ENABLE_UART: u8 =           14;
-// const CMD_DISABLE_UART: u8 =          15;
-const CMD_TX: u8 =                    16;
-const CMD_RX: u8 =                    17;
-const CMD_TXRX: u8 =                  18;
-const CMD_START: u8 =                 19;
-const CMD_STOP: u8 =                  20;
+const PORT_A_UDS_PATH: &'static str = "/var/run/tessel/port_a";
+const PORT_B_UDS_PATH: &'static str = "/var/run/tessel/port_b";
 
-// UDS locations
-const USD_PORT_A: &'static str =      "/var/run/tessel/port_a";
-const USD_PORT_B: &'static str =      "/var/run/tessel/port_b";
-
-pub struct TesselPort {
-  sock: UnixStream,
+pub struct Tessel {
+    pub port: PortGroup,
+    pub led: Vec<LED>,
+    pub button: Button
 }
 
-impl TesselPort {
+impl Tessel {
+    pub fn new() -> Tessel {
 
-  pub fn new(p: &'static str) -> Result<TesselPort, &'static str> {
-    match p {
-      "a" | "A" => Ok(TesselPort {
-        sock: UnixStream::connect(&Path::new(USD_PORT_A)).unwrap()
-      }),
-      "b" | "B" => Ok(TesselPort {
-        sock: UnixStream::connect(&Path::new(USD_PORT_B)).unwrap()
-      }),
-      _ => Err("Invalid port selected. Please choose either \"a\" or \"b\""),
-    }
-  }
+        let red_led = LED::new("red", "error");
+        let amber_led = LED::new("amber", "wlan");
+        let green_led = LED::new("green", "user1");
+        let blue_led = LED::new("blue", "user2");
 
-  pub fn run(&mut self, actions: &mut[Action]) -> IOResult<()> {
-    for i in actions.iter() {
-      try!(self.sock.write_all(&[i.cmd, i.arg]));
-      try!(self.sock.write_all(i.tx));
-    }
+        let ports = PortGroup { a: Port::new(PORT_A_UDS_PATH), b: Port::new(PORT_B_UDS_PATH) };
 
-    for i in actions.iter_mut() {
-      // TODO - get an equivalent of read_at_least in here
-      try!(self.read_all(i.rx));
-    }
-
-    Ok(())
-  }
-
-  pub fn read_all(&mut self, mut buf: &mut [u8]) -> IOResult<()> {
-    use std::io::{Error, ErrorKind};
-    let mut total = 0;
-    while total < buf.len() {
-        match self.sock.read(&mut buf[total..]) {
-            Ok(0) => return Err(Error::new(ErrorKind::Other,
-                "failed to read whole buffer",
-            )),
-            Ok(n) => total += n,
-            Err(ref e) if e.kind() == ErrorKind::Interrupted => {}
-            Err(e) => return Err(e),
+        Tessel {
+            port: ports,
+            led: vec![red_led, amber_led, green_led, blue_led],
+            button: Button {value: false}
         }
     }
-    Ok(())
-  }
-
+}
+pub struct PortGroup {
+    a: Port,
+    b: Port
+}
+pub struct Port {
+    socket_path: &'static str
 }
 
-pub struct Action<'a> {
-  cmd: u8,
-  arg: u8,
-  tx: &'a [u8],
-  rx: &'a mut [u8]
+impl Port {
+    pub fn new(path: &'static str) -> Port {
+        Port {
+            socket_path: path
+        }
+    }
 }
 
-impl<'a> Action<'a>  {
+pub struct LED {
+    color: &'static str,
+    kind: &'static str,
+    file: File,
+    value: bool
+}
 
-  pub fn echo(tx: &'a [u8], rx: &'a mut [u8]) -> Action<'a> {
-    assert!(tx.len() < 256);
-    assert_eq!(tx.len(), rx.len());
-    Action{ cmd: CMD_ECHO, arg: tx.len() as u8, tx: tx, rx: rx }
-  }
 
-  pub fn high(pin: u8) -> Action<'a> {
-    Action { cmd: CMD_GPIO_HIGH, arg: pin, tx: &[], rx: &mut [] }
-  }
+const LED_PATH_PREFIX: &'static str = "/sys/devices/leds/leds/tessel:";
+const LED_PATH_SUFFIX: &'static str = "/brightness";
+impl LED {
+    pub fn new(color: &'static str, kind: &'static str) -> LED {
 
-  pub fn low(pin: u8) -> Action<'a> {
-    Action { cmd: CMD_GPIO_LOW, arg: pin, tx: &[], rx: &mut [] }
-  }
+        let name = color.to_string() + ":" + kind;
+        let path = LED_PATH_PREFIX.to_string() + &name + LED_PATH_SUFFIX;
 
-  pub fn enable_spi() -> Action<'a> {
-    Action { cmd: CMD_ENABLE_SPI, arg: 0, tx: &[], rx: &mut [] }
-  }
+        let mut led = LED {
+            color: color,
+            kind: kind,
+            value: false,
+            file: File::create(path).unwrap()
+        };
 
-  pub fn disable_spi() -> Action<'a> {
-    Action { cmd: CMD_DISABLE_SPI, arg: 0, tx: &[], rx: &mut [] }
-  }
+        led.off().unwrap();
 
-  pub fn txrx(tx: &'a [u8], rx: &'a mut [u8])  -> Action<'a> {
-    assert!(tx.len() < 256);
-    assert_eq!(tx.len(), rx.len());
-    Action{ cmd: CMD_TXRX, arg: tx.len() as u8, tx: tx, rx: rx }
-  }
+        led
+    }
 
-  pub fn tx(tx: &'a [u8])  -> Action<'a> {
-    assert!(tx.len() < 256);
-    Action{ cmd: CMD_TX, arg: tx.len() as u8, tx: tx, rx: &mut [] }
-  }
+    pub fn on(&mut self)-> Result<(), io::Error> {
+        self.write(true)
+    }
 
-  pub fn rx(rx: &'a mut [u8])  -> Action<'a> {
-    assert!(rx.len() < 256);
-    Action{ cmd: CMD_RX, arg: rx.len() as u8, tx: &[], rx: rx }
-  }
+    pub fn off(&mut self)-> Result<(), io::Error> {
+        self.write(false)
+    }
 
-  pub fn enable_i2c() -> Action<'a> {
-    Action { cmd: CMD_ENABLE_I2C, arg: 0, tx: &[], rx: &mut [] }
-  }
+    pub fn high(&mut self)-> Result<(), io::Error> {
+        self.write(true)
+    }
 
-  pub fn disable_i2c() -> Action<'a> {
-    Action { cmd: CMD_DISABLE_I2C, arg: 0, tx: &[], rx: &mut [] }
-  }
+    pub fn low(&mut self)-> Result<(), io::Error> {
+        self.write(false)
+    }
 
-  pub fn start(addr: u8) -> Action<'a> {
-    Action { cmd: CMD_START, arg: addr, tx: &[], rx: &mut [] }
-  }
+    pub fn toggle(&mut self)-> Result<(), io::Error> {
+        let new_value = !self.value;
+        self.write(new_value)
+    }
 
-  pub fn stop() -> Action<'a> {
-    Action { cmd: CMD_STOP, arg: 0, tx: &[], rx: &mut [] }
-  } 
+    pub fn read(&self)-> bool {
+        self.value
+    }
+
+    fn write(&mut self, new_value: bool)-> Result<(), io::Error> {
+
+        self.value = new_value;
+        let string_value = match new_value {
+            true => b'1',
+            false => b'0'
+        };
+
+        self.file.write_all(&[string_value])
+    }
+}
+
+pub struct Button {
+    value: bool
 }
