@@ -6,6 +6,3 @@ authors = ["Kenneth Nierenhausen <kennethnierenhausen@gmail.com>"]
 
 [dependencies]
 unix_socket = "0.5.0"
-
-[target.mipsel-unknown-linux-gnu]
-linker = "mipsel-openwrt-linux-gcc"

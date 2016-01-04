@@ -78,16 +78,12 @@ pub struct LED {
     value: bool
 }
 
-// Prefix and suffix to every LED file path
-const LED_PATH_PREFIX: &'static str = "/sys/devices/leds/leds/tessel:";
-const LED_PATH_SUFFIX: &'static str = "/brightness";
 impl LED {
     // Factory method for creating new LEDs
     pub fn new(color: &'static str, kind: &'static str) -> LED {
 
         // Assemble the file path
-        let name = color.to_string() + ":" + kind;
-        let path = LED_PATH_PREFIX.to_string() + &name + LED_PATH_SUFFIX;
+        let path = format!("/sys/device/leds/leds/tessel:{}:{}/brightness", color, kind);
 
         // Create the LED struct
         let mut led = LED {
