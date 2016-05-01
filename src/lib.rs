@@ -1,145 +1,165 @@
-extern crate unix_socket;
-use unix_socket::UnixStream;
-
-use std::io::Result as IOResult;
+// File operations used for modifying LED state
+use std::fs::File;
+use std::io;
 use std::io::Write;
-use std::io::Read;
-use std::path::Path;
 
-// Commands
-const CMD_ECHO:u8 =                   2;
-// const CMD_GPIO_IN:u8 =                3;
-const CMD_GPIO_HIGH:u8 =              4;
-const CMD_GPIO_LOW:u8 =               5;
-// const CMD_GPIO_CFG: u8 =              6;
-// const CMD_GPIO_WAIT: u8 =             7;
-// const CMD_GPIO_INT: u8 =              8;
-const CMD_ENABLE_SPI: u8 =            10;
-const CMD_DISABLE_SPI: u8 =           11;
-const CMD_ENABLE_I2C: u8 =            12;
-const CMD_DISABLE_I2C: u8 =           13;
-// const CMD_ENABLE_UART: u8 =           14;
-// const CMD_DISABLE_UART: u8 =          15;
-const CMD_TX: u8 =                    16;
-const CMD_RX: u8 =                    17;
-const CMD_TXRX: u8 =                  18;
-const CMD_START: u8 =                 19;
-const CMD_STOP: u8 =                  20;
+// Paths to spi daemon sockets with incoming data from coprocessor
+const PORT_A_UDS_PATH: &'static str = "/var/run/tessel/port_a";
+const PORT_B_UDS_PATH: &'static str = "/var/run/tessel/port_b";
 
-// UDS locations
-const USD_PORT_A: &'static str =      "/var/run/tessel/port_a";
-const USD_PORT_B: &'static str =      "/var/run/tessel/port_b";
-
-pub struct TesselPort {
-  sock: UnixStream,
+// Primary exported Tessel object with access to module ports, leds, and a button
+#[allow(dead_code)]
+pub struct Tessel {
+    // A group of module ports
+    pub port: PortGroup,
+    // An array of LED structs
+    pub led: Vec<LED>,
+    // A single button struct
+    pub button: Button
 }
 
-impl TesselPort {
+impl Tessel {
+    // Factory metho for Tessel
+    pub fn new() -> Tessel {
 
-  pub fn new(p: &'static str) -> Result<TesselPort, &'static str> {
-    match p {
-      "a" | "A" => Ok(TesselPort {
-        sock: UnixStream::connect(&Path::new(USD_PORT_A)).unwrap()
-      }),
-      "b" | "B" => Ok(TesselPort {
-        sock: UnixStream::connect(&Path::new(USD_PORT_B)).unwrap()
-      }),
-      _ => Err("Invalid port selected. Please choose either \"a\" or \"b\""),
-    }
-  }
+        // Create a port group with two ports, one on each domain socket path
+        let ports = PortGroup { a: Port::new(PORT_A_UDS_PATH), b: Port::new(PORT_B_UDS_PATH) };
 
-  pub fn run(&mut self, actions: &mut[Action]) -> IOResult<()> {
-    for i in actions.iter() {
-      try!(self.sock.write_all(&[i.cmd, i.arg]));
-      try!(self.sock.write_all(i.tx));
-    }
+        // Create models for the four LEDs
+        let red_led = LED::new("red", "error");
+        let amber_led = LED::new("amber", "wlan");
+        let green_led = LED::new("green", "user1");
+        let blue_led = LED::new("blue", "user2");
 
-    for i in actions.iter_mut() {
-      // TODO - get an equivalent of read_at_least in here
-      try!(self.read_all(i.rx));
-    }
+        // Create the button
+        let button =  Button::new();
 
-    Ok(())
-  }
-
-  pub fn read_all(&mut self, mut buf: &mut [u8]) -> IOResult<()> {
-    use std::io::{Error, ErrorKind};
-    let mut total = 0;
-    while total < buf.len() {
-        match self.sock.read(&mut buf[total..]) {
-            Ok(0) => return Err(Error::new(ErrorKind::Other,
-                "failed to read whole buffer",
-            )),
-            Ok(n) => total += n,
-            Err(ref e) if e.kind() == ErrorKind::Interrupted => {}
-            Err(e) => return Err(e),
+        // Return the Tessel with these fields
+        Tessel {
+            port: ports,
+            led: vec![red_led, amber_led, green_led, blue_led],
+            button: button
         }
     }
-    Ok(())
-  }
-
 }
 
-pub struct Action<'a> {
-  cmd: u8,
-  arg: u8,
-  tx: &'a [u8],
-  rx: &'a mut [u8]
+// A group is a simple way to access each port through its letter identifier
+#[allow(dead_code)]
+pub struct PortGroup {
+    a: Port,
+    b: Port
 }
 
-impl<'a> Action<'a>  {
+// A model of the Tessel hardware ports
+#[allow(dead_code)]
+pub struct Port {
+    // string slice to the path of the domain socket
+    socket_path: &'static str
+}
 
-  pub fn echo(tx: &'a [u8], rx: &'a mut [u8]) -> Action<'a> {
-    assert!(tx.len() < 256);
-    assert_eq!(tx.len(), rx.len());
-    Action{ cmd: CMD_ECHO, arg: tx.len() as u8, tx: tx, rx: rx }
-  }
+impl Port {
+    // Factory method for returning a new port struct
+    pub fn new(path: &'static str) -> Port {
+        Port {
+            socket_path: path
+        }
+    }
+}
 
-  pub fn high(pin: u8) -> Action<'a> {
-    Action { cmd: CMD_GPIO_HIGH, arg: pin, tx: &[], rx: &mut [] }
-  }
+#[allow(dead_code)]
+pub struct LED {
+    // The color of the given LED (used in filepath creation)
+    color: &'static str,
+    // The type of LED (used in filepath creation)
+    kind: &'static str,
+    // The file object we write to in order to change state
+    file: File,
+    // The current value of the LED, defaults to false
+    value: bool
+}
 
-  pub fn low(pin: u8) -> Action<'a> {
-    Action { cmd: CMD_GPIO_LOW, arg: pin, tx: &[], rx: &mut [] }
-  }
+impl LED {
+    // Factory method for creating new LEDs
+    pub fn new(color: &'static str, kind: &'static str) -> LED {
 
-  pub fn enable_spi() -> Action<'a> {
-    Action { cmd: CMD_ENABLE_SPI, arg: 0, tx: &[], rx: &mut [] }
-  }
+        // Assemble the file path
+        let path = format!("/sys/device/leds/leds/tessel:{}:{}/brightness", color, kind);
 
-  pub fn disable_spi() -> Action<'a> {
-    Action { cmd: CMD_DISABLE_SPI, arg: 0, tx: &[], rx: &mut [] }
-  }
+        // Create the LED struct
+        let mut led = LED {
+            color: color,
+            kind: kind,
+            value: false,
+            // Opens the file for write operations
+            file: File::create(path).unwrap()
+        };
 
-  pub fn txrx(tx: &'a [u8], rx: &'a mut [u8])  -> Action<'a> {
-    assert!(tx.len() < 256);
-    assert_eq!(tx.len(), rx.len());
-    Action{ cmd: CMD_TXRX, arg: tx.len() as u8, tx: tx, rx: rx }
-  }
+        // Turn the LED off by default
+        led.off().unwrap();
 
-  pub fn tx(tx: &'a [u8])  -> Action<'a> {
-    assert!(tx.len() < 256);
-    Action{ cmd: CMD_TX, arg: tx.len() as u8, tx: tx, rx: &mut [] }
-  }
+        // Returns the LED
+        led
+    }
 
-  pub fn rx(rx: &'a mut [u8])  -> Action<'a> {
-    assert!(rx.len() < 256);
-    Action{ cmd: CMD_RX, arg: rx.len() as u8, tx: &[], rx: rx }
-  }
+    // Turns the LED on (same as `high`)
+    pub fn on(&mut self)-> Result<(), io::Error> {
+        self.write(true)
+    }
 
-  pub fn enable_i2c() -> Action<'a> {
-    Action { cmd: CMD_ENABLE_I2C, arg: 0, tx: &[], rx: &mut [] }
-  }
+    // Turns the LED off (same as `low`)
+    pub fn off(&mut self)-> Result<(), io::Error> {
+        self.write(false)
+    }
 
-  pub fn disable_i2c() -> Action<'a> {
-    Action { cmd: CMD_DISABLE_I2C, arg: 0, tx: &[], rx: &mut [] }
-  }
+    // Turns the LED on
+    pub fn high(&mut self)-> Result<(), io::Error> {
+        self.write(true)
+    }
 
-  pub fn start(addr: u8) -> Action<'a> {
-    Action { cmd: CMD_START, arg: addr, tx: &[], rx: &mut [] }
-  }
+    // Turns the LED off
+    pub fn low(&mut self)-> Result<(), io::Error> {
+        self.write(false)
+    }
 
-  pub fn stop() -> Action<'a> {
-    Action { cmd: CMD_STOP, arg: 0, tx: &[], rx: &mut [] }
-  } 
+    // Sets the LED to the opposite of its current state
+    pub fn toggle(&mut self)-> Result<(), io::Error> {
+        let new_value = !self.value;
+        self.write(new_value)
+    }
+
+    // Returns the current state of the LED
+    pub fn read(&self)-> bool {
+        self.value
+    }
+
+    // Helper function to write new state to LED filepath
+    fn write(&mut self, new_value: bool)-> Result<(), io::Error> {
+
+        // Save the new value to the model
+        self.value = new_value;
+        // Return the binary representation of that value type
+        let string_value = match new_value {
+            true => b'1',
+            false => b'0'
+        };
+
+        // Write that data to the file and return the result
+        self.file.write_all(&[string_value])
+    }
+}
+
+// A model of the single button on Tessel
+#[allow(dead_code)]
+pub struct Button {
+    // The button's current state
+    value: bool
+}
+
+impl Button {
+    // Factory method for new buttons
+    pub fn new() -> Button {
+        Button {
+            value: false
+        }
+    }
 }
