@@ -83,7 +83,7 @@ impl LED {
     pub fn new(color: &'static str, kind: &'static str) -> LED {
 
         // Assemble the file path
-        let path = format!("/sys/device/leds/leds/tessel:{}:{}/brightness", color, kind);
+        let path = format!("/sys/devices/leds/leds/tessel:{}:{}/brightness", color, kind);
 
         // Create the LED struct
         let mut led = LED {
