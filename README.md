@@ -2,6 +2,8 @@
 
 Looking to do some Rust development on Tessel? You’ve found the right place.
 
+**Get in touch**: the team working on Rust for Tessel is all on the #rust-lang channel of the [Tessel Slack ![](https://tessel-slack.herokuapp.com/badge.svg)](https://tessel-slack.herokuapp.com/). Join the conversation!
+
 ### The Goal
 
 The end goal of is to make it possible to control our hardware with Rust. That means taking our current API’s (in Javascript) and getting them ported over. Not only does core functionality like bus communication have to work, but all the modules as well! Fun times ahead :)
@@ -33,6 +35,7 @@ This is the outline for what’s done, what needs to be done, and what’s being
 | Ambient Module | Not Started |  |
 | Servo Module | Not Started |  |
 | Climate Module | Not Started |  |
+| GPS Module | Not Started |  | |
 
 ##### Stretch Goals
 
@@ -44,8 +47,7 @@ Calling all Rustaceans. Up for a challenge? These are some stretch goals we woul
 | Audio device | Not Started |  |
 | Camera device | Not Started |  |
 | Bluetooth device | Not Started |  |
-| Cellular device | Not Started |  |
-| GPS device | Not Started |  |
+| Cellular device | Not Started |  | |
 
 # Getting Started
 
@@ -59,10 +61,7 @@ Setup is simply how to get everything configured in order to start developing yo
 
 Note: this section needs to be updated to use t2-vm, and also have separate setups for MAC and Linux users that forces them to build their own (gaurenteed up to date) versions of the SDK and Rust MIPS Libraries.
 
-1.	Get Rust if you don't already have it
-  ```
-  curl -s https://static.rust-lang.org/rustup.sh | sudo sh
-  ```
+1.	Get Rust if you don't already have it: [Installation instructions on Rust's homepage](https://www.rust-lang.org/)
 
 1.	Create a new Cargo project if you don't already have one:
   ```
@@ -166,7 +165,7 @@ Running takes place on the device itself in order to see real results.
 
 ### Test
 
-Testing is the exact same process as running. Except when you build, specify the `--test` flag: 
+Testing is the exact same process as running. Except when you build, specify the `--test` flag:
 ```
 rustc -L ../x86_64-unknown-linux-gnu/stage2/lib/rustlib/mipsel-unknown-linux-gnu/lib --target=mipsel-unknown-linux-gnu -Ctarget-cpu=mips32r2 src/lib.rs -Clinker=mipsel-openwrt-linux-gcc -O --test
 ```
@@ -183,9 +182,3 @@ Naturally there’s going to be bugs. If there’s a problem with any of the rep
 # Staying Updated
 
 Obviously, the open source nature of this is going to cause some async issues. I highly recommend you stay up to date on this repo - subscribe, see what people are working on, be active! Make sure that you’re not working on something that’s already being done. If you are, collaborate!
-
-### Contact
-
-If you have any questions go to [the forums](https://forums.tessel.io/). We’re trying to keep all discussion open on the forums, but if you have to reach out to someone, here’s my email: ken@technical.io. I’m happy to chat about what you’re working on, take any feedback, suggestions, or comments, or just talk about life/space.
-
-
