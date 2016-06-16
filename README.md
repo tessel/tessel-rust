@@ -21,9 +21,9 @@ This is the outline for what’s done, what needs to be done, and what’s being
 ##### Core functionality
 | Feature | State | Link |
 |----------|-------------|------|
-| Tessel core functionality | In Progress (as needed) | https://github.com/tessel/rust-tessel |
+| Tessel core functionality | In Progress (as needed) | https://github.com/tessel/tessel-rust |
 | Rust CLI Update | Not Started | https://github.com/tessel/t2-cli |
-| Cargo on Tessel | In Progress | https://github.com/tessel/rust-tessel |
+| Cargo on Tessel | In Progress | https://github.com/tessel/tessel-rust |
 
 ##### Modules
 | Feature | State | Link |
