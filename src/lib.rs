@@ -8,16 +8,21 @@ const PORT_B_UDS_PATH: &'static str = "/var/run/tessel/port_b";
 
 /// Primary exported Tessel object with access to module ports, LEDs, and a button.
 /// # Example
+/// ```
 /// use rust_tessel::Tessel;
 ///
+/// # #[allow(dead_code)]
+/// # fn example() {
 /// let t = Tessel::new();
 /// // Tessel 2 has four LEDs available.
-/// assert_eq(t.led.len(), 4);
+/// assert_eq!(t.led.len(), 4);
 /// // Tessel 2 has two ports labelled a and b
-/// assert(t.ports.a);
-/// assert(t.ports.b);
+/// let a = t.port.a;
+/// let b = t.port.b;
 /// // Tessel 2 has one button.
-/// assert(t.button);
+/// let button = t.button;
+/// # }
+/// ```
 pub struct Tessel {
     // A group of module ports.
     pub port: PortGroup,
@@ -54,8 +59,8 @@ impl Tessel {
 /// A PortGroup is a simple way to access each port through its letter identifier.
 #[allow(dead_code)]
 pub struct PortGroup {
-    a: Port,
-    b: Port
+    pub a: Port,
+    pub b: Port
 }
 
 /// A Port is a model of the Tessel hardware ports.
