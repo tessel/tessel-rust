@@ -75,8 +75,9 @@ pub struct Port {
     pub socket_path: &'static str
 }
 
+// TODO: Figure out how to override the path so secretly so the example
+// can actually be run.
 /// A LED models an LED on the Tessel board.
-/// // TODO: Figure out how to override the path so secretly so this can actually be run.
 /// # Example
 /// ```rust,no_run
 /// use rust_tessel::LED;
