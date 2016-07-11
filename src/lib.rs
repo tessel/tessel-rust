@@ -29,14 +29,17 @@ pub struct Tessel {
     // An array of LED structs.
     pub led: Vec<LED>,
     // A single button struct.
-    pub button: Button
+    pub button: Button,
 }
 
 impl Tessel {
     pub fn new() -> Tessel {
 
         // Create a port group with two ports, one on each domain socket path.
-        let ports = PortGroup { a: Port{socket_path: PORT_A_UDS_PATH}, b: Port{socket_path: PORT_B_UDS_PATH}};
+        let ports = PortGroup {
+            a: Port { socket_path: PORT_A_UDS_PATH },
+            b: Port { socket_path: PORT_B_UDS_PATH },
+        };
 
         // Create models for the four LEDs.
         let red_led = LED::new("red", "error");
@@ -45,13 +48,13 @@ impl Tessel {
         let blue_led = LED::new("blue", "user2");
 
         // Create the button.
-        let button =  Button{value: false};
+        let button = Button { value: false };
 
         // Return the Tessel with these fields.
         Tessel {
             port: ports,
             led: vec![red_led, amber_led, green_led, blue_led],
-            button: button
+            button: button,
         }
     }
 }
@@ -60,7 +63,7 @@ impl Tessel {
 #[allow(dead_code)]
 pub struct PortGroup {
     pub a: Port,
-    pub b: Port
+    pub b: Port,
 }
 
 /// A Port is a model of the Tessel hardware ports.
@@ -72,7 +75,7 @@ pub struct PortGroup {
 /// ```
 pub struct Port {
     // Path of the domain socket.
-    pub socket_path: &'static str
+    pub socket_path: &'static str,
 }
 
 // TODO: Figure out how to override the path so secretly so the example
@@ -91,17 +94,19 @@ pub struct LED {
     // The file object we write to in order to change state.
     file: File,
     // The current value of the LED, defaults to false.
-    value: bool
+    value: bool,
 }
 
 impl LED {
     pub fn new(color: &'static str, kind: &'static str) -> LED {
-        let path = format!("/sys/devices/leds/leds/tessel:{}:{}/brightness", color, kind);
+        let path = format!("/sys/devices/leds/leds/tessel:{}:{}/brightness",
+                           color,
+                           kind);
 
         let mut led = LED {
             value: false,
             // Open the file for write operations.
-            file: File::create(path).unwrap()
+            file: File::create(path).unwrap(),
         };
 
         // Turn the LED off by default.
@@ -111,44 +116,44 @@ impl LED {
     }
 
     // Turn the LED on (same as `high`).
-    pub fn on(&mut self)-> Result<(), io::Error> {
+    pub fn on(&mut self) -> Result<(), io::Error> {
         self.high()
     }
 
     // Turn the LED off (same as `low`).
-    pub fn off(&mut self)-> Result<(), io::Error> {
+    pub fn off(&mut self) -> Result<(), io::Error> {
         self.low()
     }
 
     // Turn the LED on.
-    pub fn high(&mut self)-> Result<(), io::Error> {
+    pub fn high(&mut self) -> Result<(), io::Error> {
         self.write(true)
     }
 
     // Turn the LED off.
-    pub fn low(&mut self)-> Result<(), io::Error> {
+    pub fn low(&mut self) -> Result<(), io::Error> {
         self.write(false)
     }
 
     // Sets the LED to the opposite of its current state.
-    pub fn toggle(&mut self)-> Result<(), io::Error> {
+    pub fn toggle(&mut self) -> Result<(), io::Error> {
         let new_value = !self.value;
         self.write(new_value)
     }
 
     // Returns the current state of the LED.
-    pub fn read(&self)-> bool {
+    pub fn read(&self) -> bool {
         self.value
     }
 
     // Helper function to write new state to LED filepath.
-    fn write(&mut self, new_value: bool)-> Result<(), io::Error> {
+    fn write(&mut self, new_value: bool) -> Result<(), io::Error> {
         // Save the new value to the model.
         self.value = new_value;
         // Return the binary representation of that value type.
         let string_value = match new_value {
             true => b'1',
-            false => b'0'
+            false => b'0',
         };
 
         // Write that data to the file and return the result.
@@ -165,6 +170,5 @@ impl LED {
 /// ```
 pub struct Button {
     // The button's current state.
-    pub value: bool
+    pub value: bool,
 }
-
