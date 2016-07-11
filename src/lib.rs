@@ -6,8 +6,18 @@ use std::io::Write;
 const PORT_A_UDS_PATH: &'static str = "/var/run/tessel/port_a";
 const PORT_B_UDS_PATH: &'static str = "/var/run/tessel/port_b";
 
-// Primary exported Tessel object with access to module ports, LEDs, and a button.
-#[allow(dead_code)]
+/// Primary exported Tessel object with access to module ports, LEDs, and a button.
+/// # Example
+/// use rust_tessel::Tessel;
+///
+/// let t = Tessel::new();
+/// // Tessel 2 has four LEDs available.
+/// assert_eq(t.led.len(), 4);
+/// // Tessel 2 has two ports labelled a and b
+/// assert(t.ports.a);
+/// assert(t.ports.b);
+/// // Tessel 2 has one button.
+/// assert(t.button);
 pub struct Tessel {
     // A group of module ports.
     pub port: PortGroup,
@@ -18,11 +28,10 @@ pub struct Tessel {
 }
 
 impl Tessel {
-    // Returns a new Tessel object.
     pub fn new() -> Tessel {
 
         // Create a port group with two ports, one on each domain socket path.
-        let ports = PortGroup { a: Port::new(PORT_A_UDS_PATH), b: Port::new(PORT_B_UDS_PATH) };
+        let ports = PortGroup { a: Port{socket_path: PORT_A_UDS_PATH}, b: Port{socket_path: PORT_B_UDS_PATH}};
 
         // Create models for the four LEDs.
         let red_led = LED::new("red", "error");
@@ -31,7 +40,7 @@ impl Tessel {
         let blue_led = LED::new("blue", "user2");
 
         // Create the button.
-        let button =  Button::new();
+        let button =  Button{value: false};
 
         // Return the Tessel with these fields.
         Tessel {
@@ -42,34 +51,37 @@ impl Tessel {
     }
 }
 
-// A PortGroup is a simple way to access each port through its letter identifier.
+/// A PortGroup is a simple way to access each port through its letter identifier.
 #[allow(dead_code)]
 pub struct PortGroup {
     a: Port,
     b: Port
 }
 
-// A Port is a model of the Tessel hardware ports.
-#[allow(dead_code)]
+/// A Port is a model of the Tessel hardware ports.
+/// # Example
+/// ```
+/// use rust_tessel::Port;
+///
+/// let p = Port{socket_path: "path/to/my/socket"};
+/// ```
 pub struct Port {
     // Path of the domain socket.
-    socket_path: &'static str
+    pub socket_path: &'static str
 }
 
-impl Port {
-    pub fn new(path: &'static str) -> Port {
-        Port {
-            socket_path: path
-        }
-    }
-}
-
-#[allow(dead_code)]
+/// A LED models an LED on the Tessel board.
+/// // TODO: Figure out how to override the path so secretly so this can actually be run.
+/// # Example
+/// ```rust,no_run
+/// use rust_tessel::LED;
+///
+/// let mut led = LED::new("red", "error");
+/// // LEDs are off by default.
+/// assert_eq!(false, led.read());
+/// led.on().unwrap();
+/// assert_eq!(true, led.read());
 pub struct LED {
-    // The color of the given LED (used in filepath creation).
-    color: &'static str,
-    // The type of LED (used in filepath creation).
-    kind: &'static str,
     // The file object we write to in order to change state.
     file: File,
     // The current value of the LED, defaults to false.
@@ -78,12 +90,9 @@ pub struct LED {
 
 impl LED {
     pub fn new(color: &'static str, kind: &'static str) -> LED {
-
         let path = format!("/sys/devices/leds/leds/tessel:{}:{}/brightness", color, kind);
 
         let mut led = LED {
-            color: color,
-            kind: kind,
             value: false,
             // Open the file for write operations.
             file: File::create(path).unwrap()
@@ -141,17 +150,15 @@ impl LED {
     }
 }
 
-// A model of the single button on Tessel.
-#[allow(dead_code)]
+/// A model of the single button on Tessel.
+/// # Example
+/// ```
+/// use rust_tessel::Button;
+///
+/// let b = Button{value: false};
+/// ```
 pub struct Button {
     // The button's current state.
-    value: bool
+    pub value: bool
 }
 
-impl Button {
-    pub fn new() -> Button {
-        Button {
-            value: false
-        }
-    }
-}
