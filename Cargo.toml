@@ -7,5 +7,9 @@ authors = [
 	"Chris Lewis <cflewis@google.com>"
 ]
 
+[[bin]]
+name = "main"
+doc = false
+
 [dependencies]
 unix_socket = "0.5.0"
