@@ -2,7 +2,10 @@
 
 name = "rust_tessel"
 version = "0.0.1"
-authors = ["Kenneth Nierenhausen <kennethnierenhausen@gmail.com>"]
+authors = [
+	"Kenneth Nierenhausen <kennethnierenhausen@gmail.com>",
+	"Chris Lewis <cflewis@google.com>"
+]
 
 [dependencies]
 unix_socket = "0.5.0"
