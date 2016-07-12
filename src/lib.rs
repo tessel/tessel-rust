@@ -95,10 +95,15 @@ impl LED {
                            color,
                            kind);
 
+        // Open the file for write operations.
+        LED::new_with_file(File::create(path).unwrap())
+    }
+
+
+    fn new_with_file(file: File) -> LED {
         let mut led = LED {
             value: false,
-            // Open the file for write operations.
-            file: File::create(path).unwrap(),
+            file: file,
         };
 
         // Turn the LED off by default.
@@ -153,3 +158,24 @@ impl LED {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    extern crate tempfile;
+    use super::*;
+    use std::io::{Read, Seek, SeekFrom};
+
+    #[test]
+    fn led_writes_to_file() {
+        let mut tmpfile = tempfile::tempfile().unwrap();
+        let mut led = LED::new_with_file(tmpfile.try_clone().unwrap());
+        let mut buf = String::new();
+        tmpfile.seek(SeekFrom::Start(0)).unwrap();
+        tmpfile.read_to_string(&mut buf).unwrap();
+        assert_eq!("0", buf);
+        led.on().unwrap();
+        tmpfile.seek(SeekFrom::Start(0)).unwrap();
+        tmpfile.read_to_string(&mut buf).unwrap();
+        // b'1' is written as 001 into the file.
+        assert_eq!("001", buf);
+    }
+}

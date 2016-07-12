@@ -13,3 +13,6 @@ doc = false
 
 [dependencies]
 unix_socket = "0.5.0"
+
+[dev-dependencies]
+tempfile = "2.1.4"
