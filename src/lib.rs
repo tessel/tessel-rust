@@ -19,8 +19,6 @@ const PORT_B_UDS_PATH: &'static str = "/var/run/tessel/port_b";
 /// // Tessel 2 has two ports labelled a and b
 /// let a = t.port.a;
 /// let b = t.port.b;
-/// // Tessel 2 has one button.
-/// let button = t.button;
 /// # }
 /// ```
 pub struct Tessel {
@@ -28,13 +26,11 @@ pub struct Tessel {
     pub port: PortGroup,
     // An array of LED structs.
     pub led: Vec<LED>,
-    // A single button struct.
-    pub button: Button,
 }
 
 impl Tessel {
+    // new() returns a Tessel struct conforming to the Tessel 2's functionality.
     pub fn new() -> Tessel {
-
         // Create a port group with two ports, one on each domain socket path.
         let ports = PortGroup {
             a: Port { socket_path: PORT_A_UDS_PATH },
@@ -47,14 +43,10 @@ impl Tessel {
         let green_led = LED::new("green", "user1");
         let blue_led = LED::new("blue", "user2");
 
-        // Create the button.
-        let button = Button { value: false };
-
         // Return the Tessel with these fields.
         Tessel {
             port: ports,
             led: vec![red_led, amber_led, green_led, blue_led],
-            button: button,
         }
     }
 }
@@ -78,7 +70,7 @@ pub struct Port {
     pub socket_path: &'static str,
 }
 
-// TODO: Figure out how to override the path so secretly so the example
+// TODO: Figure out how to override the path secretly so the example
 // can actually be run.
 /// A LED models an LED on the Tessel board.
 /// # Example
@@ -161,14 +153,3 @@ impl LED {
     }
 }
 
-/// A model of the single button on Tessel.
-/// # Example
-/// ```
-/// use rust_tessel::Button;
-///
-/// let b = Button{value: false};
-/// ```
-pub struct Button {
-    // The button's current state.
-    pub value: bool,
-}
