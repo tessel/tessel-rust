@@ -167,6 +167,10 @@ mod tests {
     #[test]
     fn led_writes_to_file() {
         let mut tmpfile = tempfile::tempfile().unwrap();
+        // The tmpfile handle can be reused as long as LED gets its own
+        // clone of the handle, and we are diligent about seeking.
+        // This avoids needing to figure out where the tmpfile is in order
+        // to open more handles.
         let mut led = LED::new_with_file(tmpfile.try_clone().unwrap());
         let mut buf = String::new();
         tmpfile.seek(SeekFrom::Start(0)).unwrap();
