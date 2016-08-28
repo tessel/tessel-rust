@@ -1,11 +1,13 @@
 [package]
 
-name = "rust_tessel"
-version = "0.0.1"
+name = "tessel"
+version = "0.1.0"
 authors = [
 	"Kenneth Nierenhausen <kennethnierenhausen@gmail.com>",
 	"Chris Lewis <cflewis@google.com>"
 ]
+description = "Runtime library for the Tessel microcontroller."
+license = "MIT"
 
 [[bin]]
 name = "main"
