@@ -1,5 +1,7 @@
 # Rust on Tessel
 
+[![Code of Conduct](https://img.shields.io/badge/%E2%9D%A4-code%20of%20conduct-blue.svg?style=flat)](https://github.com/tessel/project/blob/master/CONDUCT.md)
+
 Looking to do some Rust development on Tessel? You’ve found the right place.
 
 **Get in touch**: the team working on Rust for Tessel is all on the #rust-lang channel of the [Tessel Slack ![](https://tessel-slack.herokuapp.com/badge.svg)](https://tessel-slack.herokuapp.com/). Join the conversation!
