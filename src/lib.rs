@@ -1,10 +1,55 @@
+extern crate unix_socket;
+
 use std::fs::File;
 use std::io;
 use std::io::Write;
+use std::io::Read;
+use std::io::Error;
+use std::u8;
+use unix_socket::UnixStream;
+
 
 // Paths to the SPI daemon sockets with incoming data from coprocessor.
 const PORT_A_UDS_PATH: &'static str = "/var/run/tessel/port_a";
 const PORT_B_UDS_PATH: &'static str = "/var/run/tessel/port_b";
+
+const MCU_MAX_SPEED: u32 = 48e6 as u32;
+// TODO: Replace with better name
+const MCU_MAX_SCL_RISE_TIME_NS: f64 = 1.5e-8 as f64;
+const MCU_MAGIC_DIV_FACTOR_FOR_I2C_BAUD: u8 = 2;
+const MCU_MAGIC_SUBTRACT_FACTOR_FOR_I2C_BAUD: u8 = 5;
+
+pub mod command {
+
+    pub const NOP: u8 = 0x00;
+    pub const FLUSH: u8 = 0x01;
+    pub const ECHO: u8 = 0x02;
+    pub const GPIO_IN: u8 = 0x03;
+    pub const GPIO_HIGH: u8 = 0x04;
+    pub const GPIO_LOW: u8 = 0x05;
+    pub const GPIO_CFG: u8 = 0x06;
+    pub const GPIO_WAIT: u8 = 0x07;
+    pub const GPIO_INT: u8 = 0x08;
+    pub const ENABLE_SPI: u8 = 0x0A;
+    pub const DISABLE_SPI: u8 = 0x0B;
+    pub const ENABLE_I2C: u8 = 0x0C;
+    pub const DISABLE_I2C: u8 = 0x0D;
+    pub const ENABLE_UART: u8 = 0x0E;
+    pub const DISABLE_UART: u8 = 0x0F;
+    pub const TX: u8 = 0x10;
+    pub const RX: u8 = 0x11;
+    pub const TXRX: u8 = 0x12;
+    pub const START: u8 = 0x13;
+    pub const STOP: u8 = 0x14;
+    pub const GPIO_TOGGLE: u8 = 0x15;
+    pub const GPIO_INPUT: u8 = 0x16;
+    pub const GPIO_RAW_READ: u8 = 0x17;
+    pub const ANALOG_READ: u8 = 0x18;
+    pub const ANALOG_WRITE: u8 = 0x19;
+    pub const GPIO_PULL: u8 = 0x1A;
+    pub const PWM_DUTY_CYCLE: u8 = 0x1B;
+    pub const PWM_PERIOD: u8 = 0x1C;
+}
 
 /// Primary exported Tessel object with access to module ports, LEDs, and a button.
 /// # Example
@@ -33,8 +78,8 @@ impl Tessel {
     pub fn new() -> Tessel {
         // Create a port group with two ports, one on each domain socket path.
         let ports = PortGroup {
-            a: Port { socket_path: PORT_A_UDS_PATH },
-            b: Port { socket_path: PORT_B_UDS_PATH },
+            a: Port::new(PORT_A_UDS_PATH),
+            b: Port::new(PORT_B_UDS_PATH),
         };
 
         // Create models for the four LEDs.
@@ -68,6 +113,113 @@ pub struct PortGroup {
 pub struct Port {
     // Path of the domain socket.
     pub socket_path: &'static str,
+    pub socket: UnixStream,
+}
+
+impl Port {
+    pub fn new(path: &'static str) -> Port {
+        // Connect to the unix domain socket for this port
+        let socket = UnixStream::connect(path).unwrap();
+        // Create and return the port struct
+        Port {
+            socket_path: path,
+            socket: socket,
+        }
+    }
+
+    pub fn i2c(&mut self, address: u8, frequency: u32) -> I2C {
+        // Create and return the I2C struct
+        I2C::new(self, address, frequency)
+    }
+}
+
+pub struct I2C<'p> {
+    pub port: &'p mut Port,
+    pub address: u8,
+    pub frequency: u32,
+}
+
+impl<'p> I2C<'p> {
+    // TODO: make frequency optional
+    pub fn new(port: &mut Port, address: u8, frequency: u32) -> I2C {
+
+        let baud: u8 = I2C::compute_baud(frequency);
+
+        let i2c = I2C {
+            port: port,
+            address: address,
+            frequency: frequency,
+        };
+
+        i2c.port.socket.write(&[command::ENABLE_I2C, baud]).unwrap();
+
+        i2c
+    }
+
+    /// Computes the baudrate as used on the Atmel SAMD21 I2C register
+    /// to set the frequency of the I2C Clock
+    /// # Example
+    /// ```
+    /// assert_eq!(compute_baud(1000000), 4);
+    /// ``
+    fn compute_baud(frequency: u32) -> u8 {
+
+        let mut intermediate: f64 = MCU_MAX_SPEED as f64 / frequency as f64;
+        intermediate = intermediate - MCU_MAX_SPEED as f64 * MCU_MAX_SCL_RISE_TIME_NS;
+        // TODO: Do not hardcode these numbers
+        intermediate = intermediate / MCU_MAGIC_DIV_FACTOR_FOR_I2C_BAUD as f64 -
+                       MCU_MAGIC_SUBTRACT_FACTOR_FOR_I2C_BAUD as f64;
+
+        // Return either the intermediate value or 255
+        let low = intermediate.min(u8::max_value() as f64);
+
+        // If we have a potentially negative register value
+        // Casting as i64 because .float does not seem to work
+        if (low as i64) < u8::min_value() as i64 {
+            // Use 0 instead
+            return u8::min_value();
+        } else {
+            // Return the new register value
+            return low as u8;
+        }
+    }
+
+    pub fn send(&mut self, write_buf: &[u8]) {
+        // TODO: Handle case where buf size is larger than u8::max_size()
+        self.port.socket.write(&[command::START, self.address << 1]).unwrap();
+        // Write the command and transfer length
+        self.port.socket.write(&[command::TX, write_buf.len() as u8]).unwrap();
+        // Write the buffer itself
+        self.port.socket.write(write_buf).unwrap();
+        // Tell I2C to send STOP condition
+        self.port.socket.write(&[command::STOP]).unwrap();
+    }
+
+    pub fn read(&mut self, read_buf: &mut [u8]) -> Result<(), Error> {
+        // TODO: Handle case where buf size is larger than u8::max_size()
+        self.port.socket.write(&[command::START, self.address << 1 | 1]).unwrap();
+        // Write the command and transfer length
+        self.port.socket.write(&[command::RX, read_buf.len() as u8]).unwrap();
+        // Tell I2C to send STOP condition
+        self.port.socket.write(&[command::STOP]).unwrap();
+        // Read in data from the socket
+        return self.port.socket.read_exact(read_buf);
+    }
+
+    pub fn transfer(&mut self, write_buf: &[u8], read_buf: &mut [u8]) -> Result<(), Error> {
+        // TODO: Handle case where buf size is larger than u8::max_size()
+        self.port.socket.write(&[command::START, self.address << 1 | 1]).unwrap();
+        // Write the command and transfer length
+        self.port.socket.write(&[command::TX, write_buf.len() as u8]).unwrap();
+        // Send start command again for the subsequent read
+        self.port.socket.write(&[command::START, self.address << 1 | 1]).unwrap();
+        // Write the command and transfer length
+        self.port.socket.write(&[command::RX, read_buf.len() as u8]).unwrap();
+        // Tell I2C to send STOP condition
+        self.port.socket.write(&[command::STOP]).unwrap();
+        // Read in data from the socket
+        return self.port.socket.read_exact(read_buf);
+    }
 }
 
 // TODO: Figure out how to override the path secretly so the example
@@ -157,7 +309,6 @@ impl LED {
         self.file.write_all(&[string_value])
     }
 }
-
 #[cfg(test)]
 mod tests {
     extern crate tempfile;
