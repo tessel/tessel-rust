@@ -9,7 +9,7 @@ const PORT_B_UDS_PATH: &'static str = "/var/run/tessel/port_b";
 /// Primary exported Tessel object with access to module ports, LEDs, and a button.
 /// # Example
 /// ```
-/// use rust_tessel::Tessel;
+/// use tessel::Tessel;
 ///
 /// # #[allow(dead_code)]
 /// # fn example() {
@@ -61,7 +61,7 @@ pub struct PortGroup {
 /// A Port is a model of the Tessel hardware ports.
 /// # Example
 /// ```
-/// use rust_tessel::Port;
+/// use tessel::Port;
 ///
 /// let p = Port{socket_path: "path/to/my/socket"};
 /// ```
@@ -75,7 +75,7 @@ pub struct Port {
 /// A LED models an LED on the Tessel board.
 /// # Example
 /// ```rust,no_run
-/// use rust_tessel::LED;
+/// use tessel::LED;
 ///
 /// let mut led = LED::new("red", "error");
 /// // LEDs are off by default.
