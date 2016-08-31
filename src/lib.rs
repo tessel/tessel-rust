@@ -1,10 +1,13 @@
 extern crate unix_socket;
 
+use std::collections::HashMap;
 use std::fs::File;
 use std::io;
-use std::io::Write;
-use std::io::Read;
 use std::io::Error;
+use std::io::Read;
+use std::io::Write;
+use std::rc::Rc;
+use std::sync::{Mutex, MutexGuard, TryLockError};
 use std::u8;
 use unix_socket::UnixStream;
 
@@ -19,8 +22,9 @@ const MCU_MAX_SCL_RISE_TIME_NS: f64 = 1.5e-8 as f64;
 const MCU_MAGIC_DIV_FACTOR_FOR_I2C_BAUD: u8 = 2;
 const MCU_MAGIC_SUBTRACT_FACTOR_FOR_I2C_BAUD: u8 = 5;
 
-pub mod command {
 
+
+pub mod command {
     pub const NOP: u8 = 0x00;
     pub const FLUSH: u8 = 0x01;
     pub const ECHO: u8 = 0x02;
@@ -112,8 +116,15 @@ pub struct PortGroup {
 /// ```
 pub struct Port {
     // Path of the domain socket.
-    pub socket_path: &'static str,
-    pub socket: UnixStream,
+    socket_path: &'static str,
+    socket: Rc<Mutex<UnixStream>>,
+    pins: HashMap<usize, Mutex<()>>,
+}
+
+pub struct Pin<'a> {
+    index: usize,
+    guard: MutexGuard<'a, ()>,
+    socket: Rc<Mutex<UnixStream>>,
 }
 
 impl Port {
@@ -123,35 +134,47 @@ impl Port {
         // Create and return the port struct
         Port {
             socket_path: path,
-            socket: socket,
+            socket: Rc::new(Mutex::new(socket)),
+            pins: HashMap::new(),
         }
     }
 
-    pub fn i2c(&mut self, address: u8, frequency: u32) -> I2C {
-        // Create and return the I2C struct
-        I2C::new(self, address, frequency)
+    pub fn pin(&self, index: usize) -> Result<Pin, TryLockError<MutexGuard<()>>> {
+        Ok(Pin {
+            index: index,
+            guard: try!(self.pins.get(&index).expect("TODO dont panic").lock()),
+            socket: self.socket.clone(),
+        })
+    }
+
+    pub fn i2c(&self, frequency: u32) -> Result<I2C, TryLockError<MutexGuard<()>>> {
+        let scl = try!(self.pin(0));
+        let sda = try!(self.pin(1));
+
+        Ok(I2C::new(self.socket.clone(), scl, sda, frequency))
     }
 }
 
 pub struct I2C<'p> {
-    pub port: &'p mut Port,
-    pub address: u8,
+    socket: Rc<Mutex<UnixStream>>,
+    _scl: Pin<'p>,
+    _sda: Pin<'p>,
     pub frequency: u32,
 }
 
 impl<'p> I2C<'p> {
     // TODO: make frequency optional
-    pub fn new(port: &mut Port, address: u8, frequency: u32) -> I2C {
-
+    fn new<'a>(socket: Rc<Mutex<UnixStream>>, scl: Pin<'a>, sda: Pin<'a>, frequency: u32) -> I2C<'a> {
         let baud: u8 = I2C::compute_baud(frequency);
 
         let i2c = I2C {
-            port: port,
-            address: address,
+            socket: socket,
+            _scl: scl,
+            _sda: sda,
             frequency: frequency,
         };
 
-        i2c.port.socket.write(&[command::ENABLE_I2C, baud]).unwrap();
+        i2c.socket.lock().unwrap().write(&[command::ENABLE_I2C, baud]).unwrap();
 
         i2c
     }
@@ -184,41 +207,41 @@ impl<'p> I2C<'p> {
         }
     }
 
-    pub fn send(&mut self, write_buf: &[u8]) {
+    pub fn send(&mut self, address: u8, write_buf: &[u8]) {
         // TODO: Handle case where buf size is larger than u8::max_size()
-        self.port.socket.write(&[command::START, self.address << 1]).unwrap();
+        self.socket.lock().unwrap().write(&[command::START, address << 1]).unwrap();
         // Write the command and transfer length
-        self.port.socket.write(&[command::TX, write_buf.len() as u8]).unwrap();
+        self.socket.lock().unwrap().write(&[command::TX, write_buf.len() as u8]).unwrap();
         // Write the buffer itself
-        self.port.socket.write(write_buf).unwrap();
+        self.socket.lock().unwrap().write(write_buf).unwrap();
         // Tell I2C to send STOP condition
-        self.port.socket.write(&[command::STOP]).unwrap();
+        self.socket.lock().unwrap().write(&[command::STOP]).unwrap();
     }
 
-    pub fn read(&mut self, read_buf: &mut [u8]) -> Result<(), Error> {
+    pub fn read(&mut self, address: u8, read_buf: &mut [u8]) -> Result<(), Error> {
         // TODO: Handle case where buf size is larger than u8::max_size()
-        self.port.socket.write(&[command::START, self.address << 1 | 1]).unwrap();
+        self.socket.lock().unwrap().write(&[command::START, address << 1 | 1]).unwrap();
         // Write the command and transfer length
-        self.port.socket.write(&[command::RX, read_buf.len() as u8]).unwrap();
+        self.socket.lock().unwrap().write(&[command::RX, read_buf.len() as u8]).unwrap();
         // Tell I2C to send STOP condition
-        self.port.socket.write(&[command::STOP]).unwrap();
+        self.socket.lock().unwrap().write(&[command::STOP]).unwrap();
         // Read in data from the socket
-        return self.port.socket.read_exact(read_buf);
+        return self.socket.lock().unwrap().read_exact(read_buf);
     }
 
-    pub fn transfer(&mut self, write_buf: &[u8], read_buf: &mut [u8]) -> Result<(), Error> {
+    pub fn transfer(&mut self, address: u8, write_buf: &[u8], read_buf: &mut [u8]) -> Result<(), Error> {
         // TODO: Handle case where buf size is larger than u8::max_size()
-        self.port.socket.write(&[command::START, self.address << 1 | 1]).unwrap();
+        self.socket.lock().unwrap().write(&[command::START, address << 1 | 1]).unwrap();
         // Write the command and transfer length
-        self.port.socket.write(&[command::TX, write_buf.len() as u8]).unwrap();
+        self.socket.lock().unwrap().write(&[command::TX, write_buf.len() as u8]).unwrap();
         // Send start command again for the subsequent read
-        self.port.socket.write(&[command::START, self.address << 1 | 1]).unwrap();
+        self.socket.lock().unwrap().write(&[command::START, address << 1 | 1]).unwrap();
         // Write the command and transfer length
-        self.port.socket.write(&[command::RX, read_buf.len() as u8]).unwrap();
+        self.socket.lock().unwrap().write(&[command::RX, read_buf.len() as u8]).unwrap();
         // Tell I2C to send STOP condition
-        self.port.socket.write(&[command::STOP]).unwrap();
+        self.socket.lock().unwrap().write(&[command::STOP]).unwrap();
         // Read in data from the socket
-        return self.port.socket.read_exact(read_buf);
+        return self.socket.lock().unwrap().read_exact(read_buf);
     }
 }
 
@@ -309,6 +332,7 @@ impl LED {
         self.file.write_all(&[string_value])
     }
 }
+
 #[cfg(test)]
 mod tests {
     extern crate tempfile;

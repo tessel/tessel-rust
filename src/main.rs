@@ -16,11 +16,11 @@ fn main() {
     // Create a new Tessel
     let mut tessel = Tessel::new();
 
-    let mut i2c = tessel.port.a.i2c(0x1d, 100000);
+    let mut i2c = tessel.port.a.i2c(100000).unwrap();
     println!("Created the I2C Port");
     let xt: [u8; 1] = [0x0d];
     let mut xr: [u8; 1] = [0; 1];
-    i2c.transfer(&xt, &mut xr).unwrap();
+    i2c.transfer(0x1d, &xt, &mut xr).unwrap();
     println!("Trasnferring i2c data complete {}", xr[0]);
 
     // Turn on one of the LEDs
