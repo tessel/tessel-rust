@@ -1,5 +1,8 @@
 extern crate unix_socket;
 
+pub mod protocol;
+
+use protocol::{command, reply};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io;
@@ -21,39 +24,6 @@ const MCU_MAX_SPEED: u32 = 48e6 as u32;
 const MCU_MAX_SCL_RISE_TIME_NS: f64 = 1.5e-8 as f64;
 const MCU_MAGIC_DIV_FACTOR_FOR_I2C_BAUD: u8 = 2;
 const MCU_MAGIC_SUBTRACT_FACTOR_FOR_I2C_BAUD: u8 = 5;
-
-
-
-pub mod command {
-    pub const NOP: u8 = 0x00;
-    pub const FLUSH: u8 = 0x01;
-    pub const ECHO: u8 = 0x02;
-    pub const GPIO_IN: u8 = 0x03;
-    pub const GPIO_HIGH: u8 = 0x04;
-    pub const GPIO_LOW: u8 = 0x05;
-    pub const GPIO_CFG: u8 = 0x06;
-    pub const GPIO_WAIT: u8 = 0x07;
-    pub const GPIO_INT: u8 = 0x08;
-    pub const ENABLE_SPI: u8 = 0x0A;
-    pub const DISABLE_SPI: u8 = 0x0B;
-    pub const ENABLE_I2C: u8 = 0x0C;
-    pub const DISABLE_I2C: u8 = 0x0D;
-    pub const ENABLE_UART: u8 = 0x0E;
-    pub const DISABLE_UART: u8 = 0x0F;
-    pub const TX: u8 = 0x10;
-    pub const RX: u8 = 0x11;
-    pub const TXRX: u8 = 0x12;
-    pub const START: u8 = 0x13;
-    pub const STOP: u8 = 0x14;
-    pub const GPIO_TOGGLE: u8 = 0x15;
-    pub const GPIO_INPUT: u8 = 0x16;
-    pub const GPIO_RAW_READ: u8 = 0x17;
-    pub const ANALOG_READ: u8 = 0x18;
-    pub const ANALOG_WRITE: u8 = 0x19;
-    pub const GPIO_PULL: u8 = 0x1A;
-    pub const PWM_DUTY_CYCLE: u8 = 0x1B;
-    pub const PWM_PERIOD: u8 = 0x1C;
-}
 
 /// Primary exported Tessel object with access to module ports, LEDs, and a button.
 /// # Example
@@ -107,6 +77,28 @@ pub struct PortGroup {
     pub b: Port,
 }
 
+pub struct PortSocket {
+    socket: UnixStream,
+}
+
+impl PortSocket {
+    pub fn write(&mut self, buffer: &[u8]) -> io::Result<()> {
+        try!(self.socket.write(buffer));
+        Ok(())
+    }
+
+    pub fn write_command(&mut self, cmd: command::Command, buffer: &[u8]) -> io::Result<()> {
+        try!(self.socket.write(&[cmd.0]));
+        try!(self.socket.write(buffer));
+        Ok(())
+    }
+
+    pub fn read_exact(&mut self, buffer: &mut [u8]) -> io::Result<()> {
+        try!(self.socket.read_exact(buffer));
+        Ok(())
+    }
+}
+
 /// A Port is a model of the Tessel hardware ports.
 /// # Example
 /// ```
@@ -117,14 +109,14 @@ pub struct PortGroup {
 pub struct Port {
     // Path of the domain socket.
     socket_path: &'static str,
-    socket: Rc<Mutex<UnixStream>>,
+    socket: Rc<Mutex<PortSocket>>,
     pins: HashMap<usize, Mutex<()>>,
 }
 
 pub struct Pin<'a> {
     index: usize,
     guard: MutexGuard<'a, ()>,
-    socket: Rc<Mutex<UnixStream>>,
+    socket: Rc<Mutex<PortSocket>>,
 }
 
 impl Port {
@@ -134,7 +126,9 @@ impl Port {
         // Create and return the port struct
         Port {
             socket_path: path,
-            socket: Rc::new(Mutex::new(socket)),
+            socket: Rc::new(Mutex::new(PortSocket {
+                socket: socket,
+            })),
             pins: HashMap::new(),
         }
     }
@@ -156,7 +150,7 @@ impl Port {
 }
 
 pub struct I2C<'p> {
-    socket: Rc<Mutex<UnixStream>>,
+    socket: Rc<Mutex<PortSocket>>,
     _scl: Pin<'p>,
     _sda: Pin<'p>,
     pub frequency: u32,
@@ -164,17 +158,17 @@ pub struct I2C<'p> {
 
 impl<'p> I2C<'p> {
     // TODO: make frequency optional
-    fn new<'a>(socket: Rc<Mutex<UnixStream>>, scl: Pin<'a>, sda: Pin<'a>, frequency: u32) -> I2C<'a> {
+    fn new<'a>(socket: Rc<Mutex<PortSocket>>, scl: Pin<'a>, sda: Pin<'a>, frequency: u32) -> I2C<'a> {
         let baud: u8 = I2C::compute_baud(frequency);
 
-        let i2c = I2C {
+        let mut i2c = I2C {
             socket: socket,
             _scl: scl,
             _sda: sda,
             frequency: frequency,
         };
 
-        i2c.socket.lock().unwrap().write(&[command::ENABLE_I2C, baud]).unwrap();
+        i2c.enable(baud);
 
         i2c
     }
@@ -207,41 +201,61 @@ impl<'p> I2C<'p> {
         }
     }
 
+    fn enable(&mut self, baud: u8) {
+        let mut sock = self.socket.lock().unwrap();
+        sock.write_command(command::ENABLE_I2C, &[baud]).unwrap();
+    }
+
     pub fn send(&mut self, address: u8, write_buf: &[u8]) {
+        let mut sock = self.socket.lock().unwrap();
         // TODO: Handle case where buf size is larger than u8::max_size()
-        self.socket.lock().unwrap().write(&[command::START, address << 1]).unwrap();
+        sock.write_command(command::START, &[address << 1]).unwrap();
         // Write the command and transfer length
-        self.socket.lock().unwrap().write(&[command::TX, write_buf.len() as u8]).unwrap();
+        sock.write_command(command::TX, &[write_buf.len() as u8]).unwrap();
         // Write the buffer itself
-        self.socket.lock().unwrap().write(write_buf).unwrap();
+        sock.write(write_buf).unwrap();
         // Tell I2C to send STOP condition
-        self.socket.lock().unwrap().write(&[command::STOP]).unwrap();
+        sock.write_command(command::STOP, &[]).unwrap();
     }
 
     pub fn read(&mut self, address: u8, read_buf: &mut [u8]) -> Result<(), Error> {
+        let mut sock = self.socket.lock().unwrap();
         // TODO: Handle case where buf size is larger than u8::max_size()
-        self.socket.lock().unwrap().write(&[command::START, address << 1 | 1]).unwrap();
+        sock.write_command(command::START, &[address << 1 | 1]).unwrap();
         // Write the command and transfer length
-        self.socket.lock().unwrap().write(&[command::RX, read_buf.len() as u8]).unwrap();
+        sock.write_command(command::RX, &[read_buf.len() as u8]).unwrap();
         // Tell I2C to send STOP condition
-        self.socket.lock().unwrap().write(&[command::STOP]).unwrap();
+        sock.write_command(command::STOP, &[]).unwrap();
+
+        // TODO: this is not how async reads should be handled.
+        // Read in first byte.
+        let mut read_byte = [0];
+        sock.read_exact(&mut read_byte);
+        assert_eq!(read_byte[0], reply::DATA.0);
         // Read in data from the socket
-        return self.socket.lock().unwrap().read_exact(read_buf);
+        return sock.read_exact(read_buf);
     }
 
     pub fn transfer(&mut self, address: u8, write_buf: &[u8], read_buf: &mut [u8]) -> Result<(), Error> {
+        let mut sock = self.socket.lock().unwrap();
         // TODO: Handle case where buf size is larger than u8::max_size()
-        self.socket.lock().unwrap().write(&[command::START, address << 1 | 1]).unwrap();
+        sock.write_command(command::START, &[address << 1 | 1]).unwrap();
         // Write the command and transfer length
-        self.socket.lock().unwrap().write(&[command::TX, write_buf.len() as u8]).unwrap();
+        sock.write_command(command::TX, &[write_buf.len() as u8]).unwrap();
         // Send start command again for the subsequent read
-        self.socket.lock().unwrap().write(&[command::START, address << 1 | 1]).unwrap();
+        sock.write_command(command::START, &[address << 1 | 1]).unwrap();
         // Write the command and transfer length
-        self.socket.lock().unwrap().write(&[command::RX, read_buf.len() as u8]).unwrap();
+        sock.write_command(command::RX, &[read_buf.len() as u8]).unwrap();
         // Tell I2C to send STOP condition
-        self.socket.lock().unwrap().write(&[command::STOP]).unwrap();
+        sock.write_command(command::STOP, &[]).unwrap();
+
+        // TODO: this is not how async reads should be handled.
+        // Read in first byte.
+        let mut read_byte = [0];
+        sock.read_exact(&mut read_byte);
+        assert_eq!(read_byte[0], reply::DATA.0);
         // Read in data from the socket
-        return self.socket.lock().unwrap().read_exact(read_buf);
+        return sock.read_exact(read_buf);
     }
 }
 
