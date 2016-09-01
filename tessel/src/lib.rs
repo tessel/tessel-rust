@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
-use std::rc::Rc;
+use std::sync::Arc;
 use std::sync::{Mutex, MutexGuard, TryLockError};
 use std::u8;
 
@@ -80,19 +80,17 @@ pub struct PortGroup {
 /// # Example
 /// ```
 /// use tessel::Port;
-///
-/// let p = Port{socket_path: "path/to/my/socket"};
 /// ```
 pub struct Port {
     // Path of the domain socket.
-    socket: Rc<Mutex<PortSocket>>,
+    socket: Arc<Mutex<PortSocket>>,
     pins: HashMap<usize, Mutex<()>>,
 }
 
 pub struct Pin<'a> {
     index: usize,
     _guard: MutexGuard<'a, ()>,
-    socket: Rc<Mutex<PortSocket>>,
+    socket: Arc<Mutex<PortSocket>>,
 }
 
 impl<'a> Pin<'a> {
@@ -115,7 +113,7 @@ impl Port {
 
         // Create and return the port struct
         Port {
-            socket: Rc::new(Mutex::new(PortSocket::new(path))),
+            socket: Arc::new(Mutex::new(PortSocket::new(path))),
             pins: pins,
         }
     }
@@ -137,7 +135,7 @@ impl Port {
 }
 
 pub struct I2C<'p> {
-    socket: Rc<Mutex<PortSocket>>,
+    socket: Arc<Mutex<PortSocket>>,
     _scl: Pin<'p>,
     _sda: Pin<'p>,
     pub frequency: u32,
@@ -145,7 +143,7 @@ pub struct I2C<'p> {
 
 impl<'p> I2C<'p> {
     // TODO: make frequency optional
-    fn new<'a>(socket: Rc<Mutex<PortSocket>>, scl: Pin<'a>, sda: Pin<'a>, frequency: u32) -> I2C<'a> {
+    fn new<'a>(socket: Arc<Mutex<PortSocket>>, scl: Pin<'a>, sda: Pin<'a>, frequency: u32) -> I2C<'a> {
         let baud: u8 = I2C::compute_baud(frequency);
 
         let mut i2c = I2C {
@@ -161,11 +159,7 @@ impl<'p> I2C<'p> {
     }
 
     /// Computes the baudrate as used on the Atmel SAMD21 I2C register
-    /// to set the frequency of the I2C Clock
-    /// # Example
-    /// ```
-    /// assert_eq!(compute_baud(1000000), 4);
-    /// ``
+    /// to set the frequency of the I2C Clock.
     fn compute_baud(frequency: u32) -> u8 {
 
         let mut intermediate: f64 = MCU_MAX_SPEED as f64 / frequency as f64;
