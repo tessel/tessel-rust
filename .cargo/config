@@ -1,2 +1,4 @@
+paths = ["./tessel"]
+
 [target.mipsel-unknown-linux-gnu]
 linker = "mipsel-openwrt-linux-gcc"

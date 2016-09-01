@@ -56,7 +56,7 @@ pub mod reply {
 
 /// Socket that communicates with the SAMD21.
 pub struct PortSocket {
-    socket_path: String,
+    _socket_path: String,
     socket: UnixStream,
 }
 
@@ -66,7 +66,7 @@ impl PortSocket {
         let socket = UnixStream::connect(path).unwrap();
 
         PortSocket {
-            socket_path: path.to_string(),
+            _socket_path: path.to_string(),
             socket: socket
         }
     }

@@ -1,13 +1,12 @@
 #![feature(alloc_system)]
+
 extern crate alloc_system;
-
-/// A blinky example for Tessel
-
 extern crate tessel;
 
 use tessel::Tessel;
 use std::thread::sleep;
 use std::time::Duration;
+use std::io::prelude::*;
 
 pub mod mma84 {
     use tessel;
@@ -21,6 +20,7 @@ pub mod mma84 {
     }
 
     #[repr(u8)]
+    #[allow(dead_code)]
     enum Command {
         OutXMsb = 0x01,
         XyzDataCfg = 0x0E,
@@ -34,6 +34,7 @@ pub mod mma84 {
     }
 
     #[repr(u8)]
+    #[allow(non_camel_case_types)]
     pub enum OutputRate {
         Rate800 = 0,
         Rate400 = 1,
@@ -112,7 +113,7 @@ pub mod mma84 {
             // Clear the three bits of output rate control (0b11000111 = 199)
             let mut value = try!(self.read_register(Command::CtrlReg1));
             value &= 0b11000111;
-            self.write_register(Command::CtrlReg1, value | ((rate as u8) << 3));
+            try!(self.write_register(Command::CtrlReg1, value | ((rate as u8) << 3)));
 
             try!(self.standby_disable());
 
@@ -129,7 +130,7 @@ pub mod mma84 {
             for (i, win) in buf.chunks(2).enumerate() {
                 // Combine the two 8 bit registers into one 12-bit number.
                 // The registers are left aligned, so right align the 12-bit integer.
-                let mut g = (((win[0] as u16) << 8) | (win[1] as u16)) >> 4;
+                let g = (((win[0] as u16) << 8) | (win[1] as u16)) >> 4;
 
                 // If the number is negative, we have to make it so manually.
                 // Transform into negative 2's complement.
@@ -167,8 +168,10 @@ fn main() {
         tessel.led[2].toggle().unwrap();
         tessel.led[3].toggle().unwrap();
         // Re-execute the loop after sleeping for 100ms
-        sleep(Duration::from_millis(300));
+        sleep(Duration::from_millis(100));
 
         println!("acceleration: {:?}", acc.read_acceleration());
+
+        let _ = std::io::stdout().flush();
     }
 }
