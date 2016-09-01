@@ -73,16 +73,12 @@ pub mod mma84 {
         }
 
         pub fn connect(&mut self) -> io::Result<()> {
-            println!("verify");
             if try!(self.read_register(Command::WhoAmI)) != 0x2A {
                 return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid connection code."))
             }
 
-            println!("but");
             try!(self.set_scale_range(ScaleRange::Scale2G));
-            println!("trust");
             try!(self.set_output_rate(OutputRate::Rate1_56));
-            println!("ok.");
 
             Ok(())
         }
