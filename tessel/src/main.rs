@@ -1,12 +1,12 @@
+#![feature(alloc_system)]
+extern crate alloc_system;
+
 /// A blinky example for Tessel
 
-// Import the tessel library
 extern crate tessel;
-// Import the Tessel API
+
 use tessel::Tessel;
-// Import sleep from the standard lib
 use std::thread::sleep;
-// Import durations from the standard lib
 use std::time::Duration;
 
 fn main() {

@@ -1,0 +1,11 @@
+[package]
+name = "accel-mma84"
+version = "0.1.0"
+authors = ["Tim Ryan <tim@tessel.io>"]
+
+[dependencies]
+tessel = "0.2.0"
+
+[[bin]]
+name = "tessel-accel"
+doc = false

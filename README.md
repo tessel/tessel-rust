@@ -22,12 +22,12 @@ This repo hosts the Tessel library that provides the hardware API (`gpio.high()`
 * `mkdir tessel-rust && cd tessel-rust` to create a folder for Rust projects
 * Next we'll setup the linker.
 
-For Linux, first download the OpenWRT SDK with: 
+For Linux, first download the OpenWRT SDK with:
 ```
 wget https://s3.amazonaws.com/builds.tessel.io/t2/OpenWRT+SDK/OpenWrt-SDK-ramips-mt7620_gcc-4.8-linaro_uClibc-0.9.33.2.Linux-x86_64.tar.bz2
 tar -xf OpenWrt-SDK-ramips-mt7620_gcc-4.8-linaro_uClibc-0.9.33.2.Linux-x86_64.tar.bz2
 ```
-Then add the SDK linker to your path: 
+Then add the SDK linker to your path:
 ```
 export PATH=$(readlink -f ./OpenWrt-SDK-ramips-mt7620_gcc-4.8-linaro_uClibc-0.9.33.2.Linux-x86_64/staging_dir/toolchain-mipsel_24kec+dsp_gcc-4.8-linaro_uClibc-0.9.33.2/bin/):$PATH
 ```
@@ -38,7 +38,9 @@ wget https://s3.amazonaws.com/builds.tessel.io/t2/OpenWRT+SDK/OpenWrt-SDK-ramips
 tar -xf OpenWrt-SDK-ramips-mt7620_gcc-4.8-linaro_uClibc-0.9.33.2.Darwin-x86_64.tar.bz2
 ```
 Then add the linker to your path:
-```export PATH=$(pwd)/openwrt/staging_dir/toolchain-mipsel_24kec+dsp_gcc-4.8-linaro_uClibc-0.9.33.2/bin/):$PATH```
+```
+export PATH=$(pwd)/openwrt/staging_dir/toolchain-mipsel_24kec+dsp_gcc-4.8-linaro_uClibc-0.9.33.2/bin/:$PATH
+```
 
 * Create a test project
 ```
@@ -69,7 +71,7 @@ extern crate alloc_system;
 
 * Build the project (in release mode to optimize the size of the binary)
 ```
-cargo build --release
+cargo build --release --target=mipsel-unknown-linux-gnu
 ```
 * You can now `scp` it over to your Tessel and run it!
 ```
@@ -78,6 +80,7 @@ ssh -i ~/.tessel/id_rsa root@YOUR_TESSEL_IP ./tmp/hello-rust
 ```
 
 ## Developing on the Remote Cross Compilation Server (`Docker`, `git` and `Node` 4.x are requirements)
+
 * Clone the [cross-compilation server repo](https://github.com/tessel/rust-compilation-server) and checkout the `jon-1.0.0` branch.
 * Build the Docker image with `docker build -t rustcc .`, then run it with `docker run -p 49160:8080 rustcc`.
 * [Clone](https://github.com/tessel/t2-cli) or install the command line interface: `npm install t2-cli -g`
@@ -106,7 +109,7 @@ In order to integrate with the CLI, we need to write a deployment plugin. This p
 The CLI will detect a Rust project, bundle it into a tarball, send it to the cross compilation server, and then deploy the resulting binary to an available Tessel.
 
 ## Tessel Standard Library
-The Tessel Standard Library (this repo) is the library that gets 'loaded' into a user program (runs on T2) and presents an API for configuring the hardware (LEDs, module ports, network interfaces, etc.). 
+The Tessel Standard Library (this repo) is the library that gets 'loaded' into a user program (runs on T2) and presents an API for configuring the hardware (LEDs, module ports, network interfaces, etc.).
 You can see the JavaScript version of the Tessel Standard Library [here](https://github.com/tessel/t2-firmware/blob/master/node/tessel-export.js). The most important function is communication with module ports which takes places by writing to a Unix Domain Socket always running on OpenWRT. See [the technical overview](https://github.com/tessel/onboarding/blob/master/T2-TECHNICAL-OVERVIEW.md) or previously linked JS Standard Library for more detailed information on how that works. Everything sent to the domain socket gets sent to the microcontroller. There is a simple protocol between the MediaTek (running OpenWRT) and the coprocessor to coordinate hardware operations.
 
 ## Module Libraries

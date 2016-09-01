@@ -1,16 +1,18 @@
 [package]
 
 name = "tessel"
-version = "0.1.0"
+version = "0.2.0"
 authors = [
+	"Chris Lewis <cflewis@google.com>",
+	"Jon McKay <jon@tessel.io>",
 	"Kenneth Nierenhausen <kennethnierenhausen@gmail.com>",
-	"Chris Lewis <cflewis@google.com>"
+	"Tim Ryan <tim@tessel.io>",
 ]
 description = "Runtime library for the Tessel microcontroller."
 license = "MIT"
 
 [[bin]]
-name = "main"
+name = "hello-rust"
 doc = false
 
 [dependencies]
