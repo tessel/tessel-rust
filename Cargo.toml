@@ -10,7 +10,7 @@ description = "Runtime library for the Tessel microcontroller."
 license = "MIT"
 
 [[bin]]
-name = "main"
+name = "hello-rust"
 doc = false
 
 [dependencies]

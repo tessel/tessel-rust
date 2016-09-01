@@ -106,10 +106,15 @@ impl<'a> Pin<'a> {
 
 impl Port {
     pub fn new(path: &str) -> Port {
+        let mut pins = HashMap::new();
+        for i in 0..8 {
+            pins.insert(i, Mutex::new(()));
+        }
+
         // Create and return the port struct
         Port {
             socket: Rc::new(Mutex::new(PortSocket::new(path))),
-            pins: HashMap::new(),
+            pins: pins,
         }
     }
 
@@ -235,6 +240,7 @@ impl<'p> I2C<'p> {
         let _ = sock.read_exact(&mut read_byte);
         assert_eq!(read_byte[0], reply::DATA.0);
         // Read in data from the socket
+        println!("h1");
         return sock.read_exact(read_buf);
     }
 }
