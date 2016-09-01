@@ -11,6 +11,8 @@ use std::rc::Rc;
 use std::sync::{Mutex, MutexGuard, TryLockError};
 use std::u8;
 
+// TODO Corking reduces latency, as spid adds overhead for each packet
+
 
 // Paths to the SPI daemon sockets with incoming data from coprocessor.
 const PORT_A_UDS_PATH: &'static str = "/var/run/tessel/port_a";
@@ -191,26 +193,37 @@ impl<'p> I2C<'p> {
         sock.write_command(command::ENABLE_I2C, &[baud]).unwrap();
     }
 
-    pub fn send(&mut self, address: u8, write_buf: &[u8]) {
-        let mut sock = self.socket.lock().unwrap();
+    fn tx(&self, sock: &mut MutexGuard<PortSocket>, address: u8, write_buf: &[u8]) {
         // TODO: Handle case where buf size is larger than u8::max_size()
         sock.write_command(command::START, &[address << 1]).unwrap();
         // Write the command and transfer length
         sock.write_command(command::TX, &[write_buf.len() as u8]).unwrap();
-        // Write the buffer itself
+        // TODO chunk >256
         sock.write(write_buf).unwrap();
-        // Tell I2C to send STOP condition
-        sock.write_command(command::STOP, &[]).unwrap();
     }
 
-    pub fn read(&mut self, address: u8, read_buf: &mut [u8]) -> io::Result<()> {
-        let mut sock = self.socket.lock().unwrap();
+    fn rx(&self, sock: &mut MutexGuard<PortSocket>, address: u8, read_buf: &mut [u8]) {
         // TODO: Handle case where buf size is larger than u8::max_size()
         sock.write_command(command::START, &[address << 1 | 1]).unwrap();
         // Write the command and transfer length
         sock.write_command(command::RX, &[read_buf.len() as u8]).unwrap();
+    }
+
+    fn stop(&self, sock: &mut MutexGuard<PortSocket>) {
         // Tell I2C to send STOP condition
         sock.write_command(command::STOP, &[]).unwrap();
+    }
+
+    pub fn send(&mut self, address: u8, write_buf: &[u8]) {
+        let mut sock = self.socket.lock().unwrap();
+        self.tx(&mut sock, address, write_buf);
+        self.stop(&mut sock);
+    }
+
+    pub fn read(&mut self, address: u8, read_buf: &mut [u8]) -> io::Result<()> {
+        let mut sock = self.socket.lock().unwrap();
+        self.rx(&mut sock, address, read_buf);
+        self.stop(&mut sock);
 
         // TODO: this is not how async reads should be handled.
         // Read in first byte.
@@ -223,21 +236,16 @@ impl<'p> I2C<'p> {
 
     pub fn transfer(&mut self, address: u8, write_buf: &[u8], read_buf: &mut [u8]) -> io::Result<()> {
         let mut sock = self.socket.lock().unwrap();
-        // TODO: Handle case where buf size is larger than u8::max_size()
-        sock.write_command(command::START, &[address << 1 | 1]).unwrap();
-        // Write the command and transfer length
-        sock.write_command(command::TX, &[write_buf.len() as u8]).unwrap();
-        // Send start command again for the subsequent read
-        sock.write_command(command::START, &[address << 1 | 1]).unwrap();
-        // Write the command and transfer length
-        sock.write_command(command::RX, &[read_buf.len() as u8]).unwrap();
-        // Tell I2C to send STOP condition
-        sock.write_command(command::STOP, &[]).unwrap();
+        self.tx(&mut sock, address, write_buf);
+        self.rx(&mut sock, address, read_buf);
+        self.stop(&mut sock);
 
         // TODO: this is not how async reads should be handled.
         // Read in first byte.
         let mut read_byte = [0];
+        println!("sent");
         let _ = sock.read_exact(&mut read_byte);
+        println!("h1");
         assert_eq!(read_byte[0], reply::DATA.0);
         // Read in data from the socket
         println!("h1");

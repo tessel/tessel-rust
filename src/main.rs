@@ -3,25 +3,48 @@ extern crate alloc_system;
 
 /// A blinky example for Tessel
 
-// Import the tessel library
 extern crate tessel;
-// Import the Tessel API
+
 use tessel::Tessel;
-// Import sleep from the standard lib
 use std::thread::sleep;
-// Import durations from the standard lib
 use std::time::Duration;
+
+pub mod mma84 {
+    use tessel;
+    use std::io;
+
+    pub struct Accelerometer<'a> {
+        i2c: tessel::I2C<'a>,
+    }
+
+    impl<'a> Accelerometer<'a> {
+        pub fn new<'b>(i2c: tessel::I2C<'b>) -> Accelerometer<'b> {
+            Accelerometer {
+                i2c: i2c,
+            }
+        }
+
+        pub fn connect(&mut self) -> io::Result<()> {
+            let xt: [u8; 1] = [0x0d];
+            let mut xr: [u8; 1] = [0; 1];
+            self.i2c.transfer(0x1d, &xt, &mut xr).unwrap();
+
+            if xr[0] == 0x2A {
+                Ok(())
+            } else {
+                Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid connection code."))
+            }
+        }
+    }
+}
 
 fn main() {
     // Create a new Tessel
     let mut tessel = Tessel::new();
 
-    let mut i2c = tessel.port.a.i2c(100000).unwrap();
-    println!("Created the I2C Port");
-    let xt: [u8; 1] = [0x0d];
-    let mut xr: [u8; 1] = [0; 1];
-    i2c.transfer(0x1d, &xt, &mut xr).unwrap();
-    println!("Trasnferring i2c data complete {}", xr[0]);
+    let mut acc = mma84::Accelerometer::new(tessel.port.a.i2c(100000).unwrap());
+    acc.connect().expect("Could not connect to accelerometer.");
+    println!("Connected!");
 
     // Turn on one of the LEDs
     tessel.led[2].on().unwrap();
