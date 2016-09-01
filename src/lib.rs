@@ -243,12 +243,9 @@ impl<'p> I2C<'p> {
         // TODO: this is not how async reads should be handled.
         // Read in first byte.
         let mut read_byte = [0];
-        println!("sent");
         let _ = sock.read_exact(&mut read_byte);
-        println!("h1");
         assert_eq!(read_byte[0], reply::DATA.0);
         // Read in data from the socket
-        println!("h1");
         return sock.read_exact(read_buf);
     }
 }
