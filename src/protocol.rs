@@ -1,3 +1,7 @@
+use std::io;
+use std::io::prelude::*;
+use unix_socket::UnixStream;
+
 /// Starting byte of transmission commands. Because this is extensible, we use
 /// a list of constants instead of an enum.
 pub mod command {
@@ -48,4 +52,38 @@ pub mod reply {
     /// c0 to c8 is all async pin assignments.
     pub const ASYNC_PIN_CHANGE_N: Reply = Reply(0xC0);
     pub const ASYNC_UART_RX: Reply = Reply(0xD0);
+}
+
+/// Socket that communicates with the SAMD21.
+pub struct PortSocket {
+    socket_path: String,
+    socket: UnixStream,
+}
+
+impl PortSocket {
+    pub fn new(path: &str) -> PortSocket {
+        // Connect to the unix domain socket for this port
+        let socket = UnixStream::connect(path).unwrap();
+
+        PortSocket {
+            socket_path: path.to_string(),
+            socket: socket
+        }
+    }
+
+    pub fn write(&mut self, buffer: &[u8]) -> io::Result<()> {
+        try!(self.socket.write(buffer));
+        Ok(())
+    }
+
+    pub fn write_command(&mut self, cmd: command::Command, buffer: &[u8]) -> io::Result<()> {
+        try!(self.socket.write(&[cmd.0]));
+        try!(self.socket.write(buffer));
+        Ok(())
+    }
+
+    pub fn read_exact(&mut self, buffer: &mut [u8]) -> io::Result<()> {
+        try!(self.socket.read_exact(buffer));
+        Ok(())
+    }
 }

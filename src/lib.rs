@@ -2,17 +2,14 @@ extern crate unix_socket;
 
 pub mod protocol;
 
-use protocol::{command, reply};
+use protocol::{command, reply, PortSocket};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io;
-use std::io::Error;
-use std::io::Read;
-use std::io::Write;
+use std::io::prelude::*;
 use std::rc::Rc;
 use std::sync::{Mutex, MutexGuard, TryLockError};
 use std::u8;
-use unix_socket::UnixStream;
 
 
 // Paths to the SPI daemon sockets with incoming data from coprocessor.
@@ -77,28 +74,6 @@ pub struct PortGroup {
     pub b: Port,
 }
 
-pub struct PortSocket {
-    socket: UnixStream,
-}
-
-impl PortSocket {
-    pub fn write(&mut self, buffer: &[u8]) -> io::Result<()> {
-        try!(self.socket.write(buffer));
-        Ok(())
-    }
-
-    pub fn write_command(&mut self, cmd: command::Command, buffer: &[u8]) -> io::Result<()> {
-        try!(self.socket.write(&[cmd.0]));
-        try!(self.socket.write(buffer));
-        Ok(())
-    }
-
-    pub fn read_exact(&mut self, buffer: &mut [u8]) -> io::Result<()> {
-        try!(self.socket.read_exact(buffer));
-        Ok(())
-    }
-}
-
 /// A Port is a model of the Tessel hardware ports.
 /// # Example
 /// ```
@@ -108,27 +83,32 @@ impl PortSocket {
 /// ```
 pub struct Port {
     // Path of the domain socket.
-    socket_path: &'static str,
     socket: Rc<Mutex<PortSocket>>,
     pins: HashMap<usize, Mutex<()>>,
 }
 
 pub struct Pin<'a> {
     index: usize,
-    guard: MutexGuard<'a, ()>,
+    _guard: MutexGuard<'a, ()>,
     socket: Rc<Mutex<PortSocket>>,
 }
 
+impl<'a> Pin<'a> {
+    pub fn output(&mut self, value: bool) -> io::Result<()> {
+        let mut sock = self.socket.lock().unwrap();
+        if value {
+            sock.write_command(command::GPIO_HIGH, &[self.index as u8])
+        } else {
+            sock.write_command(command::GPIO_LOW, &[self.index as u8])
+        }
+    }
+}
+
 impl Port {
-    pub fn new(path: &'static str) -> Port {
-        // Connect to the unix domain socket for this port
-        let socket = UnixStream::connect(path).unwrap();
+    pub fn new(path: &str) -> Port {
         // Create and return the port struct
         Port {
-            socket_path: path,
-            socket: Rc::new(Mutex::new(PortSocket {
-                socket: socket,
-            })),
+            socket: Rc::new(Mutex::new(PortSocket::new(path))),
             pins: HashMap::new(),
         }
     }
@@ -136,7 +116,7 @@ impl Port {
     pub fn pin(&self, index: usize) -> Result<Pin, TryLockError<MutexGuard<()>>> {
         Ok(Pin {
             index: index,
-            guard: try!(self.pins.get(&index).expect("TODO dont panic").lock()),
+            _guard: try!(self.pins.get(&index).expect("TODO dont panic on pin fetch").lock()),
             socket: self.socket.clone(),
         })
     }
@@ -218,7 +198,7 @@ impl<'p> I2C<'p> {
         sock.write_command(command::STOP, &[]).unwrap();
     }
 
-    pub fn read(&mut self, address: u8, read_buf: &mut [u8]) -> Result<(), Error> {
+    pub fn read(&mut self, address: u8, read_buf: &mut [u8]) -> io::Result<()> {
         let mut sock = self.socket.lock().unwrap();
         // TODO: Handle case where buf size is larger than u8::max_size()
         sock.write_command(command::START, &[address << 1 | 1]).unwrap();
@@ -230,13 +210,13 @@ impl<'p> I2C<'p> {
         // TODO: this is not how async reads should be handled.
         // Read in first byte.
         let mut read_byte = [0];
-        sock.read_exact(&mut read_byte);
+        let _ = sock.read_exact(&mut read_byte);
         assert_eq!(read_byte[0], reply::DATA.0);
         // Read in data from the socket
         return sock.read_exact(read_buf);
     }
 
-    pub fn transfer(&mut self, address: u8, write_buf: &[u8], read_buf: &mut [u8]) -> Result<(), Error> {
+    pub fn transfer(&mut self, address: u8, write_buf: &[u8], read_buf: &mut [u8]) -> io::Result<()> {
         let mut sock = self.socket.lock().unwrap();
         // TODO: Handle case where buf size is larger than u8::max_size()
         sock.write_command(command::START, &[address << 1 | 1]).unwrap();
@@ -252,7 +232,7 @@ impl<'p> I2C<'p> {
         // TODO: this is not how async reads should be handled.
         // Read in first byte.
         let mut read_byte = [0];
-        sock.read_exact(&mut read_byte);
+        let _ = sock.read_exact(&mut read_byte);
         assert_eq!(read_byte[0], reply::DATA.0);
         // Read in data from the socket
         return sock.read_exact(read_buf);
