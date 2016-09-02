@@ -2,7 +2,7 @@ extern crate unix_socket;
 
 pub mod protocol;
 
-use protocol::{command, reply, PortSocket};
+use protocol::{Command, reply, PortSocket};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io;
@@ -97,9 +97,9 @@ impl<'a> Pin<'a> {
     pub fn output(&mut self, value: bool) -> io::Result<()> {
         let mut sock = self.socket.lock().unwrap();
         if value {
-            sock.write_command(command::GPIO_HIGH, &[self.index as u8])
+            sock.write_command(Command::GpioHigh(self.index as u8))
         } else {
-            sock.write_command(command::GPIO_LOW, &[self.index as u8])
+            sock.write_command(Command::GpioLow(self.index as u8))
         }
     }
 }
@@ -184,28 +184,24 @@ impl<'p> I2C<'p> {
 
     fn enable(&mut self, baud: u8) {
         let mut sock = self.socket.lock().unwrap();
-        sock.write_command(command::ENABLE_I2C, &[baud]).unwrap();
+        sock.write_command(Command::EnableI2C{ baud: baud }).unwrap();
     }
 
     fn tx(&self, sock: &mut MutexGuard<PortSocket>, address: u8, write_buf: &[u8]) {
-        // TODO: Handle case where buf size is larger than u8::max_size()
-        sock.write_command(command::START, &[address << 1]).unwrap();
-        // Write the command and transfer length
-        sock.write_command(command::TX, &[write_buf.len() as u8]).unwrap();
-        // TODO chunk >256
-        sock.write(write_buf).unwrap();
+        sock.write_command(Command::Start(address<<1)).unwrap();
+        // Write the command and data
+        sock.write_command(Command::Tx(write_buf)).unwrap();
     }
 
     fn rx(&self, sock: &mut MutexGuard<PortSocket>, address: u8, read_buf: &mut [u8]) {
-        // TODO: Handle case where buf size is larger than u8::max_size()
-        sock.write_command(command::START, &[address << 1 | 1]).unwrap();
+        sock.write_command(Command::Start(address << 1 | 1)).unwrap();
         // Write the command and transfer length
-        sock.write_command(command::RX, &[read_buf.len() as u8]).unwrap();
+        sock.write_command(Command::Rx(read_buf.len() as u8)).unwrap();
     }
 
     fn stop(&self, sock: &mut MutexGuard<PortSocket>) {
         // Tell I2C to send STOP condition
-        sock.write_command(command::STOP, &[]).unwrap();
+        sock.write_command(Command::Stop).unwrap();
     }
 
     pub fn send(&mut self, address: u8, write_buf: &[u8]) {
@@ -222,7 +218,7 @@ impl<'p> I2C<'p> {
         // TODO: this is not how async reads should be handled.
         // Read in first byte.
         let mut read_byte = [0];
-        let _ = sock.read_exact(&mut read_byte);
+        try!(sock.read_exact(&mut read_byte));
         assert_eq!(read_byte[0], reply::DATA.0);
         // Read in data from the socket
         return sock.read_exact(read_buf);
@@ -237,7 +233,7 @@ impl<'p> I2C<'p> {
         // TODO: this is not how async reads should be handled.
         // Read in first byte.
         let mut read_byte = [0];
-        let _ = sock.read_exact(&mut read_byte);
+        try!(sock.read_exact(&mut read_byte));
         assert_eq!(read_byte[0], reply::DATA.0);
         // Read in data from the socket
         return sock.read_exact(read_buf);
