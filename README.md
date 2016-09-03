@@ -2,23 +2,50 @@
 
 [![Code of Conduct](https://img.shields.io/badge/%E2%9D%A4-code%20of%20conduct-blue.svg?style=flat)](https://github.com/tessel/project/blob/master/CONDUCT.md)
 
-Looking to do some Rust development on Tessel? You’ve found the right place.
+Looking to do some Rust development on Tessel? You’ve found the right place. This repo hosts the Tessel library that provides the hardware API (`gpio.high()`, `spi.transfer()`, etc.) to user applications. It is currently incomplete but being actively worked on. We'd love your help to reach feature parity with the [JavaScript API](https://tessel.io/docs/hardwareAPI)!
 
 **Get in touch**: the team working on Rust for Tessel is all on the #rust-lang channel of the [Tessel Slack ![](https://tessel-slack.herokuapp.com/badge.svg)](https://tessel-slack.herokuapp.com/). Join the conversation!
 
-### tessel-rust
-This repo hosts the Tessel library that provides the hardware API (`gpio.high()`, `spi.transfer()`, etc.) to user applications. It is currently incomplete (see gist above for current status) and could use your help to finish it up. The API should end up being very similar to the [JavaScript API](https://tessel.io/docs/hardwareAPI).
+## Quickstart (using remote compilation)
 
-### Overview for using Rust on Tessel
+Tessel requires `node` 4.x and `git`. If you haven't yet, install the Tessel 2 CLI using `npm install t2-cli -g`.
 
-**tl;dr** We are working on getting Rust deployment finalized and merged into the command line interface. Rust can be compiled on a remote cross-compilation server or locally using `rustup` on OSX and Linux. We can deploy simple scripts that output to the console but cannot yet control the module ports or network APIs (see the bottom section for what kind of contributions would be useful).
+To create and deploy the blinking lights example, run the following commands:
 
-## Quick Start with Remote Compilation (`git`, and `Node` 4.x` are requirements)
-* Install the CLI if you haven't already: `npm install t2-cli -g`
-* Create a Rust project with a blinky example: `t2 init --lang=rust` (or `cargo new hello --bin`)
-* Deploy to your Tessel with the CLI: `t2 run Cargo.toml`
+```
+mkdir rust-fun; cd rust-fun
+t2 init --lang=rust
+t2 run Cargo.toml
+```
 
-## Quick Start with Local Compilation based on [@badboy's work](https://gist.github.com/badboy/8b951981aaf8bc1700b4703f9c201484) (`rustup`, `git` and `Node` 4.x are requirements)
+The CLI will cross-compile your code on our compilation server, then serve the bundle to your local Tessel. You should see Tessel respond by blinking its user lights alternatingly.
+
+## Tessel Standard Library
+
+The **Tessel Standard Library** is the library that gets 'loaded' into a user program (runs on T2) and presents an API for configuring the hardware (LEDs, module ports, network interfaces, etc.).
+You can see the JavaScript version of the Tessel Standard Library [here](https://github.com/tessel/t2-firmware/blob/master/node/tessel-export.js). The most important function is communication with module ports which takes places by writing to a Unix Domain Socket always running on OpenWRT. See [the technical overview](https://github.com/tessel/onboarding/blob/master/T2-TECHNICAL-OVERVIEW.md) or previously linked JS Standard Library for more detailed information on how that works. Everything sent to the domain socket gets sent to the microcontroller. There is a simple protocol between the MediaTek (running OpenWRT) and the coprocessor to coordinate hardware operations.
+
+Every **Tessel (hardware)** Module has a corresponding software module with the driver code that calls the Standard Library API. The module is managed and installed via a package manager (ie `npm` for Node and `cargo` for Rust). You can see an example of a [JS implementation of our accelerometer module](http://github.com/tessel/accel-mma84). Every hardware module we've made will require its library be ported to Rust and published on crates.io.
+
+## Deploying Rust to Tessel
+
+**tl;dr** Rust can be compiled on a remote cross-compilation server (automatically using `t2 run`), or locally using `rustup` on OSX and Linux. We still lack complete implementations for module ports and Tessel-specific network APIs. See the bottom section for what contributions would be useful.
+
+### Rust Integration Process
+
+In order to use Rust on Tessel, there are several components that are required:
+
+1. Cross Compilation Capabilities - Tessel runs a MIPS architecture which means we have to compile for MIPS instead of our host computer CPU
+2. Command Line Interface Deployment - The same CLI used for deploying JS needs a plugin built for deplying to Rust
+3. Tessel Standard Library (this repo) - The Tessel-specific library that gives access to the LEDS, button, and module ports
+4. Module Libraries - Each Tessel Module needs its library ported from JS to Rust and released as a Cargo Crate
+
+### Remote Compilation Server
+
+See the [rust-compilation-server](https://github.com/tessel/rust-compilation-server/) repo for how to develop for the remote compilation server.
+
+### Local Compilation based on [@badboy's work](https://gist.github.com/badboy/8b951981aaf8bc1700b4703f9c201484) (`rustup`, `git` and `Node` 4.x are requirements)
+
 * `mkdir tessel-rust && cd tessel-rust` to create a folder for Rust projects
 * Next we'll setup the linker.
 
@@ -79,44 +106,10 @@ scp target/mipsel-unknown-linux-gnu/release/hello-rust root@192.168.1.101:/tmp
 ssh -i ~/.tessel/id_rsa root@YOUR_TESSEL_IP ./tmp/hello-rust
 ```
 
-## Developing on the Remote Cross Compilation Server (`Docker`, `git` and `Node` 4.x are requirements)
+## Steps to completion and ways you can contribute
 
-* Clone the [cross-compilation server repo](https://github.com/tessel/rust-compilation-server) and checkout the `jon-1.0.0` branch.
-* Build the Docker image with `docker build -t rustcc .`, then run it with `docker run -p 49160:8080 rustcc`.
-* [Clone](https://github.com/tessel/t2-cli) or install the command line interface: `npm install t2-cli -g`
-* Make a new directory and inside, create a new Rust project with `t2 init --lang=rust` (it contains a blinky example)
-* Deploy the project with `t2 run Cargo.toml --rustcc=$(docker-machine ip):49160`
-* To make changes to the server, open two shell. In the first, get access to the shell of the Docker server with `docker attach DOCKER_ID` (you can get your `DOCKER_ID` from `docker ps`. Make changes to `index.js` and then run `docker cp index.js DOCKER_ID:/usr/src/app`. If you make changes to the Dockerfile, run `docker build .`.
+Not in any particular order:
 
-# Entire Rust Integration Process
-In order to use Rust on Tessel, there are several components that need to be built out to integrate with the existing system:
-1. Cross Compilation Capabilities - Tessel runs a MIPS architecture which means we have to compile for MIPS instead of our host computer CPU
-2. Command Line Interface Deployment - The same CLI used for deploying JS needs a plugin built for deplying to Rust
-3. Tessel Standard Library (this repo) - The Tessel-specific library that gives access to the LEDS, button, and module ports
-4. Module Libraries - Each Tessel Module needs its library ported from JS to Rust and released as a Cargo Crate
-
-
-## Cross Compilation Capabilities
-We got started on building a cross-compilation server several months ago. @kevinmehall did a bunch of work to figure out exactly how to build a Rust binary for the MIPS architecture and that work has been automated into [this Docker script](https://github.com/tessel/rust-compilation-server/blob/master/Dockerfile).
-The [cross compilation server](https://github.com/tessel/rust-compilation-server) includes that Dockerfile as well as Node server that presents an single API endpoint for cross-compilation. It receives a POST request that sends a tarred project directory, cross compiles that project, then sends the tarred binary back down to the client.  The server is awaiting [v1.0 to land](https://github.com/tessel/rust-compilation-server/pull/6).
-To run it, clone this directory and checkout the `jon-1.0.0` branch, build the Docker image (requires Docker to be installed) with `docker build . -t rustCC`, then run it with `docker run -p 49160:8080 rustCC`.
-
-We would eventually like to use [`rustup`](http://blog.rust-lang.org/2016/05/13/rustup.html) for cross compilation within the CLI. It's better suited for the task because it's an easy pathway for local cross-compilation rather than depending on an internet connection and a long-lived remote cross-compilation server. It is better integrated into existing Rust tools like Cargo. We are at a point where we have `rustup` functional with a single workaround and are in the process of integrating into the CLI. We do not have `rustup` functional on Windows.
-
-## Command Line Inteface Deployment
-Tessel projects have traditionally been deployed using a command line tool written in JavaScript (with Node.js). In order to bootstrap Rust development on Tessel, we plan to start deploying Rust as well with the same tool (it can be installed with `npm install t2-cli -g`). Eventually, we'd love to build most of the core functionality in Rust and link to that binary with JavaScript (or in whatever language is being deployed) but that's a stretch goal.
-In order to integrate with the CLI, we need to write a deployment plugin. This plugin outlines how to detect Rust programs, any pre-deployment steps and any post-deployment steps. A basic version of this integration has been [completed and is awaiting review](https://github.com/tessel/t2-cli/pull/774). This plugin has only been tested with simple programs (ie `cargo new hello --bin`) and can certainly use more testing.
-The CLI will detect a Rust project, bundle it into a tarball, send it to the cross compilation server, and then deploy the resulting binary to an available Tessel.
-
-## Tessel Standard Library
-The Tessel Standard Library (this repo) is the library that gets 'loaded' into a user program (runs on T2) and presents an API for configuring the hardware (LEDs, module ports, network interfaces, etc.).
-You can see the JavaScript version of the Tessel Standard Library [here](https://github.com/tessel/t2-firmware/blob/master/node/tessel-export.js). The most important function is communication with module ports which takes places by writing to a Unix Domain Socket always running on OpenWRT. See [the technical overview](https://github.com/tessel/onboarding/blob/master/T2-TECHNICAL-OVERVIEW.md) or previously linked JS Standard Library for more detailed information on how that works. Everything sent to the domain socket gets sent to the microcontroller. There is a simple protocol between the MediaTek (running OpenWRT) and the coprocessor to coordinate hardware operations.
-
-## Module Libraries
-Every Tessel (hardware) Module has a corresponding software module with the driver code that calls the Standard Library API. The module is managed and installed via a package manager (ie `npm` for Node and `cargo` for Rust).
-You can see an example of a JS driver [here with the accelerometer module](http://github.com/tessel/accel-mma84). Every hardware module we've made needs to get ported to Rust and deployed to crates.io
-
-## Ways you can help right now (not in any particular order)
 - [x] Get another pair of eyes on the cross-compilation server (it's quite simple)
 - [x] Help deploy the cross-compilation server to a Digital Ocean droplet
 - [ ] Try out the CLI branch that enables Rust deployment with more complicated projects
@@ -129,3 +122,7 @@ You can see an example of a JS driver [here with the accelerometer module](http:
 - [ ] Release the standard library on Crates.io when it's ready
 - [ ] Start porting each of the module libraries from JavaScript to Rust (dependent on building out the standard library for Rust)
 - [ ] Write [documentation for Rust usage](https://www.github.com/tessel/docs) on Tessel 2
+
+## License
+
+MIT or Apache-2.0, at your option.
