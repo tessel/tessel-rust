@@ -1,7 +1,7 @@
 #![feature(alloc_system)]
+extern crate alloc_system;
 
 extern crate accel_mma84;
-extern crate alloc_system;
 extern crate tessel;
 
 use accel_mma84::Accelerometer;
