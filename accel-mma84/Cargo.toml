@@ -1,13 +1,10 @@
 [package]
 name = "accel-mma84"
-version = "0.1.1"
+version = "0.2.0-beta.3"
 authors = ["Tim Ryan <tim@tessel.io>"]
 description = "Driver for an MMA8452Q 3-axis accelerometer."
 license = "MIT"
 
 [dependencies]
-tessel = "0.2.0"
-
-[[bin]]
-name = "tessel-accel"
-doc = false
+# tessel = { path = "../tessel" }
+tessel = "0.3.0-beta.3"

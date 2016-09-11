@@ -1,0 +1,12 @@
+[package]
+name = "nickel"
+version = "0.1.0"
+authors = ["Tim Ryan <id@timryan.org>"]
+
+[dependencies]
+nickel = "0.8.1"
+rustc-serialize = "0.3"
+# tessel = { path = "../tessel" }
+# accel-mma84 = { path = "../accel-mma84" }
+tessel = "0.3.0-beta.3"
+accel-mma84 = "0.2.0-beta.3"

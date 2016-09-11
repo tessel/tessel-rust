@@ -1,15 +1,18 @@
+#[macro_use] extern crate lazy_static;
+extern crate atomic_option;
 extern crate unix_socket;
 
 pub mod protocol;
 
+use atomic_option::AtomicOption;
 use protocol::{Command, reply, PortSocket};
-use std::collections::HashMap;
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
-use std::sync::Arc;
-use std::sync::{Mutex, MutexGuard, TryLockError};
-use std::u8;
+use std::marker::PhantomData;
+use std::sync::atomic::Ordering;
+use std::collections::BTreeSet;
+use std::sync::{Arc, Mutex, MutexGuard};
 
 // TODO Corking reduces latency, as spid adds overhead for each packet
 
@@ -40,21 +43,21 @@ const MCU_MAGIC_SUBTRACT_FACTOR_FOR_I2C_BAUD: u8 = 5;
 /// # }
 /// ```
 pub struct Tessel {
-    // A group of module ports.
-    pub port: PortGroup,
     // An array of LED structs.
     pub led: Vec<LED>,
+}
+
+lazy_static! {
+    // Create a tuple with two ports, one on each domain socket path.
+    static ref TESSEL_PORTS: AtomicOption<(Port, Port)> = AtomicOption::new(Box::new((
+        Port::new(PORT_A_UDS_PATH),
+        Port::new(PORT_B_UDS_PATH),
+    )));
 }
 
 impl Tessel {
     // new() returns a Tessel struct conforming to the Tessel 2's functionality.
     pub fn new() -> Tessel {
-        // Create a port group with two ports, one on each domain socket path.
-        let ports = PortGroup {
-            a: Port::new(PORT_A_UDS_PATH),
-            b: Port::new(PORT_B_UDS_PATH),
-        };
-
         // Create models for the four LEDs.
         let red_led = LED::new("red", "error");
         let amber_led = LED::new("amber", "wlan");
@@ -63,17 +66,13 @@ impl Tessel {
 
         // Return the Tessel with these fields.
         Tessel {
-            port: ports,
             led: vec![red_led, amber_led, green_led, blue_led],
         }
     }
-}
 
-/// A PortGroup is a simple way to access each port through its letter identifier.
-#[allow(dead_code)]
-pub struct PortGroup {
-    pub a: Port,
-    pub b: Port,
+    pub fn ports() -> Option<(Port, Port)> {
+        TESSEL_PORTS.take(Ordering::Relaxed).map(|x| *x)
+    }
 }
 
 /// A Port is a model of the Tessel hardware ports.
@@ -82,18 +81,113 @@ pub struct PortGroup {
 /// use tessel::Port;
 /// ```
 pub struct Port {
-    // Path of the domain socket.
     socket: Arc<Mutex<PortSocket>>,
-    pins: HashMap<usize, Mutex<()>>,
 }
 
+impl Port {
+    pub fn new(path: &str) -> Port {
+        // Create and return the port struct
+        Port {
+            socket: Arc::new(Mutex::new(PortSocket::new(path))),
+        }
+    }
+
+    pub fn pins(&mut self) -> (Pin, Pin, Pin) {
+        (
+            Pin::new(5, self.socket.clone()),
+            Pin::new(6, self.socket.clone()),
+            Pin::new(7, self.socket.clone()),
+        )
+    }
+
+    pub fn i2c<'b>(self) -> (I2cPort<'b>, Gpio<'b>) {
+        let mut available = BTreeSet::new();
+        for i in 2..8 {
+            available.insert(i);
+        }
+        (I2cPort::new(self.socket.clone()), Gpio::new(self.socket.clone(), available))
+    }
+}
+
+/// Gpio is a selection of pins.
+#[allow(dead_code)]
+pub struct Gpio<'a> {
+    socket: Arc<Mutex<PortSocket>>,
+    available: BTreeSet<usize>,
+    _phantom: PhantomData<&'a Port>,
+}
+
+impl<'a> Gpio<'a> {
+    pub fn new<'b>(socket: Arc<Mutex<PortSocket>>, available: BTreeSet<usize>) -> Gpio<'b> {
+        // Create and return the port struct
+        Gpio {
+            socket: socket,
+            available: available,
+            _phantom: PhantomData,
+        }
+    }
+
+    // TODO return iterator
+    //pub fn pins() { }
+
+    pub fn pin_select<H: PinSelect<'a>>(self, select: H) -> H::Output {
+        select.select(self.socket.clone())
+    }
+}
+
+/// Pin tuple conversion for gpio:pins(..)
+pub trait PinSelect<'a> {
+    type Output;
+    fn validate(&self, &BTreeSet<usize>) -> bool;
+    fn select(&self, socket: Arc<Mutex<PortSocket>>) -> Self::Output;
+}
+
+impl<'a> PinSelect<'a> for usize {
+    type Output = Pin<'a>;
+    fn validate(&self, set: &BTreeSet<usize>) -> bool {
+        set.contains(self)
+    }
+    fn select<'b>(&self, socket: Arc<Mutex<PortSocket>>) -> Self::Output {
+        Pin::new(*self, socket)
+    }
+}
+
+impl<'a> PinSelect<'a> for (usize, usize) {
+    type Output = (Pin<'a>, Pin<'a>);
+    fn validate(&self, set: &BTreeSet<usize>) -> bool {
+        set.contains(&self.0) || set.contains(&self.1)
+    }
+    fn select<'b>(&self, socket: Arc<Mutex<PortSocket>>) -> Self::Output {
+        (Pin::new(self.0, socket.clone()), Pin::new(self.1, socket))
+    }
+}
+
+impl<'a> PinSelect<'a> for (usize, usize, usize) {
+    type Output = (Pin<'a>, Pin<'a>, Pin<'a>);
+    fn validate(&self, set: &BTreeSet<usize>) -> bool {
+        set.contains(&self.0) || set.contains(&self.1) || set.contains(&self.2)
+    }
+    fn select<'b>(&self, socket: Arc<Mutex<PortSocket>>) -> Self::Output {
+        (Pin::new(self.0, socket.clone()), Pin::new(self.1, socket.clone()), Pin::new(self.2, socket))
+    }
+}
+
+/// A GPIO pin usable as an input or output.
 pub struct Pin<'a> {
     index: usize,
-    _guard: MutexGuard<'a, ()>,
     socket: Arc<Mutex<PortSocket>>,
+    _phantom: PhantomData<&'a Port>,
 }
 
 impl<'a> Pin<'a> {
+    fn new<'b>(index: usize, socket: Arc<Mutex<PortSocket>>) -> Pin<'b> {
+        Pin {
+            index: index,
+            socket: socket,
+            _phantom: PhantomData,
+        }
+    }
+
     pub fn output(&mut self, value: bool) -> io::Result<()> {
         let mut sock = self.socket.lock().unwrap();
         if value {
@@ -104,56 +198,22 @@ impl<'a> Pin<'a> {
     }
 }
 
-impl Port {
-    pub fn new(path: &str) -> Port {
-        let mut pins = HashMap::new();
-        for i in 0..8 {
-            pins.insert(i, Mutex::new(()));
-        }
-
-        // Create and return the port struct
-        Port {
-            socket: Arc::new(Mutex::new(PortSocket::new(path))),
-            pins: pins,
-        }
-    }
-
-    pub fn pin(&self, index: usize) -> Result<Pin, TryLockError<MutexGuard<()>>> {
-        Ok(Pin {
-            index: index,
-            _guard: try!(self.pins.get(&index).expect("TODO dont panic on pin fetch").lock()),
-            socket: self.socket.clone(),
-        })
-    }
-
-    pub fn i2c(&self, frequency: u32) -> Result<I2C, TryLockError<MutexGuard<()>>> {
-        let scl = try!(self.pin(0));
-        let sda = try!(self.pin(1));
-
-        Ok(I2C::new(self.socket.clone(), scl, sda, frequency))
-    }
-}
-
-pub struct I2C<'p> {
+/// An I2C Port.
+pub struct I2cPort<'a> {
     socket: Arc<Mutex<PortSocket>>,
-    _scl: Pin<'p>,
-    _sda: Pin<'p>,
-    pub frequency: u32,
+    _phantom: PhantomData<&'a Port>,
 }
 
-impl<'p> I2C<'p> {
+impl<'p> I2cPort<'p> {
     // TODO: make frequency optional
-    fn new<'a>(socket: Arc<Mutex<PortSocket>>, scl: Pin<'a>, sda: Pin<'a>, frequency: u32) -> I2C<'a> {
-        let baud: u8 = I2C::compute_baud(frequency);
-
-        let mut i2c = I2C {
+    fn new<'a>(socket: Arc<Mutex<PortSocket>>) -> I2cPort<'a> {
+        let mut i2c = I2cPort {
             socket: socket,
-            _scl: scl,
-            _sda: sda,
-            frequency: frequency,
+            _phantom: PhantomData,
         };
 
-        i2c.enable(baud);
+        // Use 100Khz as default frequency.
+        i2c.enable(I2cPort::compute_baud(100_000));
 
         i2c
     }
@@ -161,7 +221,6 @@ impl<'p> I2C<'p> {
     /// Computes the baudrate as used on the Atmel SAMD21 I2C register
     /// to set the frequency of the I2C Clock.
     fn compute_baud(frequency: u32) -> u8 {
-
         let mut intermediate: f64 = MCU_MAX_SPEED as f64 / frequency as f64;
         intermediate = intermediate - MCU_MAX_SPEED as f64 * MCU_MAX_SCL_RISE_TIME_NS;
         // TODO: Do not hardcode these numbers
@@ -184,36 +243,40 @@ impl<'p> I2C<'p> {
 
     fn enable(&mut self, baud: u8) {
         let mut sock = self.socket.lock().unwrap();
-        sock.write_command(Command::EnableI2C{ baud: baud }).unwrap();
+        sock.write_command(Command::EnableI2c { baud: baud }).unwrap();
     }
 
-    fn tx(&self, sock: &mut MutexGuard<PortSocket>, address: u8, write_buf: &[u8]) {
+    fn tx(sock: &mut MutexGuard<PortSocket>, address: u8, write_buf: &[u8]) {
         sock.write_command(Command::Start(address<<1)).unwrap();
         // Write the command and data
         sock.write_command(Command::Tx(write_buf)).unwrap();
     }
 
-    fn rx(&self, sock: &mut MutexGuard<PortSocket>, address: u8, read_buf: &mut [u8]) {
+    fn rx(sock: &mut MutexGuard<PortSocket>, address: u8, read_buf: &mut [u8]) {
         sock.write_command(Command::Start(address << 1 | 1)).unwrap();
         // Write the command and transfer length
         sock.write_command(Command::Rx(read_buf.len() as u8)).unwrap();
     }
 
-    fn stop(&self, sock: &mut MutexGuard<PortSocket>) {
+    fn stop(sock: &mut MutexGuard<PortSocket>) {
         // Tell I2C to send STOP condition
         sock.write_command(Command::Stop).unwrap();
     }
 
+    pub fn set_frequency(&mut self, frequency: u32) {
+        self.enable(I2cPort::compute_baud(frequency));
+    }
+
     pub fn send(&mut self, address: u8, write_buf: &[u8]) {
         let mut sock = self.socket.lock().unwrap();
-        self.tx(&mut sock, address, write_buf);
-        self.stop(&mut sock);
+        I2cPort::tx(&mut sock, address, write_buf);
+        I2cPort::stop(&mut sock);
     }
 
     pub fn read(&mut self, address: u8, read_buf: &mut [u8]) -> io::Result<()> {
         let mut sock = self.socket.lock().unwrap();
-        self.rx(&mut sock, address, read_buf);
-        self.stop(&mut sock);
+        I2cPort::rx(&mut sock, address, read_buf);
+        I2cPort::stop(&mut sock);
 
         // TODO: this is not how async reads should be handled.
         // Read in first byte.
@@ -226,9 +289,9 @@ impl<'p> I2C<'p> {
 
     pub fn transfer(&mut self, address: u8, write_buf: &[u8], read_buf: &mut [u8]) -> io::Result<()> {
         let mut sock = self.socket.lock().unwrap();
-        self.tx(&mut sock, address, write_buf);
-        self.rx(&mut sock, address, read_buf);
-        self.stop(&mut sock);
+        I2cPort::tx(&mut sock, address, write_buf);
+        I2cPort::rx(&mut sock, address, read_buf);
+        I2cPort::stop(&mut sock);
 
         // TODO: this is not how async reads should be handled.
         // Read in first byte.

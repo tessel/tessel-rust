@@ -39,7 +39,7 @@ mod raw_cmd {
 pub enum Command<'a> {
     Nop,
     Flush,
-    
+
     GpioIn(u8),
     GpioHigh(u8),
     GpioLow(u8),
@@ -53,11 +53,11 @@ pub enum Command<'a> {
     AnalogRead(u8),
 
     AnalogWrite{ pin: u8, value: u8 },
-    
+
     EnableSpi{ mode: u8, freq: u8, div: u8 },
     DisableSpi,
-    EnableI2C{ baud: u8 },
-    DisableI2C,
+    EnableI2c{ baud: u8 },
+    DisableI2c,
     EnableUart{ baud: u8, mode: u8 },
     DisableUart,
 
@@ -147,11 +147,11 @@ impl PortSocket {
             AnalogRead(pin) => socket.write_all(&[raw_cmd::ANALOG_READ, pin]),
 
             AnalogWrite{ pin, value } => socket.write_all(&[raw_cmd::ANALOG_WRITE, pin, value]),
-            
+
             EnableSpi{ mode, freq, div } => socket.write_all(&[raw_cmd::ENABLE_SPI, mode, freq, div]),
             DisableSpi => socket.write_all(&[raw_cmd::DISABLE_SPI]),
-            EnableI2C{ baud } => socket.write_all(&[raw_cmd::ENABLE_I2C, baud]),
-            DisableI2C => socket.write_all(&[raw_cmd::DISABLE_I2C]),
+            EnableI2c{ baud } => socket.write_all(&[raw_cmd::ENABLE_I2C, baud]),
+            DisableI2c => socket.write_all(&[raw_cmd::DISABLE_I2C]),
             EnableUart{ baud, mode } => socket.write_all(&[raw_cmd::ENABLE_UART, baud, mode]),
             DisableUart => socket.write_all(&[raw_cmd::DISABLE_UART]),
 

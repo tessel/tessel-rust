@@ -14,7 +14,8 @@ fn main() {
     // Create a new Tessel
     let mut tessel = Tessel::new();
 
-    let mut acc = Accelerometer::new(tessel.port.a.i2c(100000).unwrap());
+    let (mut port_a, _) = Tessel::ports().unwrap();
+    let mut acc = Accelerometer::new(port_a);
     acc.connect().expect("Could not connect to accelerometer.");
     println!("Connected!");
 
