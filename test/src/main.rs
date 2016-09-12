@@ -3,20 +3,16 @@
 extern crate alloc_system;
 
 #[macro_use] extern crate nickel;
-extern crate rustc_serialize;
 extern crate accel_mma84;
+extern crate local_ip;
+extern crate rustc_serialize;
 extern crate tessel;
 
 use accel_mma84::Accelerometer;
+use nickel::{Nickel, HttpRouter, MediaType};
+use rustc_serialize::json;
+use std::sync::Mutex;
 use tessel::Tessel;
-use std::thread::sleep;
-use std::time::Duration;
-use std::io::prelude::*;
-use std::collections::BTreeMap;
-use nickel::status::StatusCode;
-use nickel::{Nickel, JsonBody, HttpRouter, MediaType};
-use rustc_serialize::json::{self, Json, ToJson};
-use std::sync::{Arc, Mutex};
 
 #[derive(RustcDecodable, RustcEncodable)]
 struct Measurement {
@@ -25,6 +21,7 @@ struct Measurement {
     z: f64,
 }
 
+const INDEX_HTML: &'static str = include_str!("index.html");
 
 fn main() {
     // Create a new Tessel
@@ -32,19 +29,17 @@ fn main() {
 
     let mut acc = Accelerometer::new(port_a);
     acc.connect().expect("Could not connect to accelerometer.");
-    println!("Connected!");
-
-    // Turn on one of the LEDs
-    let mut tessel = Tessel::new();
-    tessel.led[2].on().unwrap();
-
-    println!("I'm blinking! (Press CTRL + C to stop)");
+    println!("Connected to accelerometer.");
 
     let mut server = Nickel::new();
-
     let sensor = Mutex::new(acc);
 
-    server.get("/", middleware! { |req, mut res|
+    server.get("/", middleware! { |_, mut res|
+        res.set(MediaType::Html);
+        INDEX_HTML
+    });
+
+    server.get("/api/acceleration", middleware! { |_, mut res|
         let (x, y, z) = sensor.lock().unwrap().read_acceleration().unwrap();
 
         let reading = Measurement {
@@ -58,5 +53,8 @@ fn main() {
         json::encode(&reading).unwrap()
     });
 
-    server.listen("127.0.0.1:6767");
+    // Print local IP
+    println!("LAN: http://{}/", local_ip::get().unwrap());
+
+    server.listen("0.0.0.0:80");
 }

@@ -1,5 +1,5 @@
 [package]
-name = "nickel"
+name = "tessel-rust-tests"
 version = "0.1.0"
 authors = ["Tim Ryan <id@timryan.org>"]
 
@@ -10,3 +10,4 @@ rustc-serialize = "0.3"
 # accel-mma84 = { path = "../accel-mma84" }
 tessel = "0.3.0-beta.3"
 accel-mma84 = "0.2.0-beta.3"
+local-ip = "0.1"

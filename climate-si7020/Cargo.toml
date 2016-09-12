@@ -1,0 +1,10 @@
+[package]
+name = "climate-si7020"
+version = "0.1.0"
+authors = ["Tim Ryan <tim@tessel.io>"]
+description = "Driver for an SI7020 temperature and humidity sensor."
+license = "MIT"
+
+[dependencies]
+tessel = { path = "../tessel" }
+# tessel = "0.3.0-beta.3"
