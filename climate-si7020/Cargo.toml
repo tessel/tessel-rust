@@ -6,5 +6,4 @@ description = "Driver for an SI7020 temperature and humidity sensor."
 license = "MIT"
 
 [dependencies]
-tessel = { path = "../tessel" }
-# tessel = "0.3.0-beta.3"
+tessel = { path = "../tessel", version = "0.3.0" }

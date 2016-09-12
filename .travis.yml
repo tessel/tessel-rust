@@ -10,3 +10,7 @@ script:
   - cargo build
   - cargo test
   - cargo doc
+  - cd ../climate-si7020
+  - cargo build
+  - cargo test
+  - cargo doc

@@ -1,7 +1,7 @@
 [package]
 
 name = "tessel"
-version = "0.3.0-beta.3"
+version = "0.3.0"
 authors = [
 	"Chris Lewis <cflewis@google.com>",
 	"Jon McKay <jon@tessel.io>",
