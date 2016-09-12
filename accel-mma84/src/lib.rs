@@ -7,9 +7,9 @@ use std::io;
 
 #[repr(u8)]
 pub enum ScaleRange {
-    Scale2G = 0x00,
-    Scale4G = 0x01,
-    Scale8G = 0x10,
+    Scale2G = 0b00,
+    Scale4G = 0b01,
+    Scale8G = 0b10,
 }
 
 #[repr(u8)]
