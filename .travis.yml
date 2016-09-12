@@ -1,16 +1,23 @@
 language: rust
 rust:
   - nightly
+
 script:
   - cd tessel
   - cargo build
   - cargo test
   - cargo doc
+
   - cd ../accel-mma84
   - cargo build
   - cargo test
   - cargo doc
+
   - cd ../climate-si7020
   - cargo build
   - cargo test
   - cargo doc
+
+  - cd ../test
+  - cargo build
+  - cargo test
