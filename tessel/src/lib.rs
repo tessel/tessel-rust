@@ -37,9 +37,6 @@ const MCU_MAGIC_SUBTRACT_FACTOR_FOR_I2C_BAUD: u8 = 5;
 /// let t = Tessel::new();
 /// // Tessel 2 has four LEDs available.
 /// assert_eq!(t.led.len(), 4);
-/// // Tessel 2 has two ports labelled a and b
-/// let a = t.port.a;
-/// let b = t.port.b;
 /// # }
 /// ```
 pub struct Tessel {

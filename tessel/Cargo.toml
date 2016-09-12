@@ -11,9 +11,9 @@ authors = [
 description = "Runtime library for the Tessel microcontroller."
 license = "MIT"
 
-# [[bin]]
-# name = "hello-rust"
-# doc = false
+[[bin]]
+name = "hello-rust"
+doc = false
 
 [dependencies]
 unix_socket = "0.5.0"

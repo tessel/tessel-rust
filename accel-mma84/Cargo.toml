@@ -5,5 +5,9 @@ authors = ["Tim Ryan <tim@tessel.io>"]
 description = "Driver for an MMA8452Q 3-axis accelerometer."
 license = "MIT"
 
+[[bin]]
+name = "tessel-accel"
+doc = false
+
 [dependencies]
 tessel = { path = "../tessel", version = "0.3.0" }

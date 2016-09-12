@@ -5,5 +5,9 @@ authors = ["Tim Ryan <tim@tessel.io>"]
 description = "Driver for an SI7020 temperature and humidity sensor."
 license = "MIT"
 
+[[bin]]
+name = "tessel-climate"
+doc = false
+
 [dependencies]
 tessel = { path = "../tessel", version = "0.3.0" }
