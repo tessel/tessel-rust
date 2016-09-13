@@ -1,6 +1,7 @@
 #[macro_use] extern crate lazy_static;
 extern crate atomic_option;
 extern crate unix_socket;
+extern crate bit_set;
 
 pub mod protocol;
 
@@ -11,7 +12,7 @@ use std::io;
 use std::io::prelude::*;
 use std::marker::PhantomData;
 use std::sync::atomic::Ordering;
-use std::collections::BTreeSet;
+use bit_set::BitSet;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 // TODO Corking reduces latency, as spid adds overhead for each packet
@@ -98,7 +99,7 @@ impl Port {
     }
 
     pub fn i2c<'b>(self) -> (I2cPort<'b>, Gpio<'b>) {
-        let mut available = BTreeSet::new();
+        let mut available = BitSet::new();
         for i in 2..8 {
             available.insert(i);
         }
@@ -110,12 +111,12 @@ impl Port {
 #[allow(dead_code)]
 pub struct Gpio<'a> {
     socket: Arc<Mutex<PortSocket>>,
-    available: BTreeSet<usize>,
+    available: BitSet,
     _phantom: PhantomData<&'a Port>,
 }
 
 impl<'a> Gpio<'a> {
-    pub fn new<'b>(socket: Arc<Mutex<PortSocket>>, available: BTreeSet<usize>) -> Gpio<'b> {
+    pub fn new<'b>(socket: Arc<Mutex<PortSocket>>, available: BitSet) -> Gpio<'b> {
         // Create and return the port struct
         Gpio {
             socket: socket,
@@ -135,14 +136,14 @@ impl<'a> Gpio<'a> {
 /// Pin tuple conversion for gpio:pins(..)
 pub trait PinSelect<'a> {
     type Output;
-    fn validate(&self, &BTreeSet<usize>) -> bool;
+    fn validate(&self, &BitSet<usize>) -> bool;
     fn select(&self, socket: Arc<Mutex<PortSocket>>) -> Self::Output;
 }
 
 impl<'a> PinSelect<'a> for usize {
     type Output = Pin<'a>;
-    fn validate(&self, set: &BTreeSet<usize>) -> bool {
-        set.contains(self)
+    fn validate(&self, set: &BitSet<usize>) -> bool {
+        set.contains(*self)
     }
     fn select<'b>(&self, socket: Arc<Mutex<PortSocket>>) -> Self::Output {
         Pin::new(*self, socket)
@@ -151,8 +152,8 @@ impl<'a> PinSelect<'a> for usize {
 
 impl<'a> PinSelect<'a> for (usize, usize) {
     type Output = (Pin<'a>, Pin<'a>);
-    fn validate(&self, set: &BTreeSet<usize>) -> bool {
-        set.contains(&self.0) || set.contains(&self.1)
+    fn validate(&self, set: &BitSet<usize>) -> bool {
+        set.contains(self.0) || set.contains(self.1)
     }
     fn select<'b>(&self, socket: Arc<Mutex<PortSocket>>) -> Self::Output {
         (Pin::new(self.0, socket.clone()), Pin::new(self.1, socket))
@@ -161,8 +162,8 @@ impl<'a> PinSelect<'a> for (usize, usize) {
 
 impl<'a> PinSelect<'a> for (usize, usize, usize) {
     type Output = (Pin<'a>, Pin<'a>, Pin<'a>);
-    fn validate(&self, set: &BTreeSet<usize>) -> bool {
-        set.contains(&self.0) || set.contains(&self.1) || set.contains(&self.2)
+    fn validate(&self, set: &BitSet<usize>) -> bool {
+        set.contains(self.0) || set.contains(self.1) || set.contains(self.2)
     }
     fn select<'b>(&self, socket: Arc<Mutex<PortSocket>>) -> Self::Output {
         (Pin::new(self.0, socket.clone()), Pin::new(self.1, socket.clone()), Pin::new(self.2, socket))
