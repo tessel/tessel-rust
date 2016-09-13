@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+<title>Acceleration</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.14.0/axios.min.js"></script>
+<style>
+
+body{
+  background-color: #adea66;
+}
+
+.container {
+  padding-top:50px;
+  margin-left:auto;
+  margin-right:auto;
+  width: 200px;
+  height: 200px;
+  position: relative;
+  perspective: 1000px;
+
+}
+
+#cube {
+  width: 100%;
+  height: 100%;
+  position:absolute;
+  transform-style: preserve-3d;
+}
+
+#cube figure {
+  margin: 0;
+  width: 204px;
+  height: 204px;
+  display: block;
+  position: absolute;
+  border: black solid 3px;
+
+	-webkit-border-radius: 10px;
+	-moz-border-radius: 10px;
+	border-radius: 10px;
+}
+
+#cube .front  { transform: rotateY(   0deg ) translateZ( 100px ); background-color: #bc0311; }
+#cube .back   { transform: rotateX( 180deg ) translateZ( 100px ); background-color: #9c3311; }
+#cube .right  { transform: rotateY(  90deg ) translateZ( 100px ); background-color: #dc0111; }
+#cube .left   { transform: rotateY( -90deg ) translateZ( 100px ); background-color: #dc8011; }
+#cube .top    { transform: rotateX(  90deg ) translateZ( 100px ); background-color: #bc8011; }
+#cube .bottom { transform: rotateX( -90deg ) translateZ( 100px ); background-color: #9c8011; }
+
+#cube { transform: translateZ( -100px ); }
+
+</style>
+<body>
+<h1>Accelerometer Demo</h1>
+<pre id="dump">Loading...</pre>
+<section class="container">
+  <div id="cube">
+    <figure id="one" class="front"></figure>
+    <figure id="two" class="back"></figure>
+    <figure id="three" class="right"></figure>
+    <figure id="four" class="left"></figure>
+    <figure id="five" class="top"></figure>
+    <figure id="six" class="bottom"></figure>
+  </div>
+</section>
+</body>
+<script>
+
+function loop () {
+  axios.get('/api/acceleration')
+  .then(function (response) {
+    response.data.x
+    document.querySelector('#dump').innerText = JSON.stringify(response.data);
+    document.querySelector('#cube').style.transform =
+      'rotateX(' + (response.data.y*Math.PI) + 'rad) ' +
+      'rotateY(' + (response.data.z*Math.PI) + 'rad) ' +
+      'rotateZ(' + (-response.data.x*Math.PI) + 'rad) ' +
+      'translateZ(-100px)';
+    setTimeout(loop, 0);
+  })
+  .catch(function (error) {
+    console.log(error);
+    setTimeout(loop, 1000);
+  });
+}
+
+setTimeout(loop, 0);
+
+</script>
+</html>

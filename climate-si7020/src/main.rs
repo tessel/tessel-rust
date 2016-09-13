@@ -1,10 +1,10 @@
 #![feature(alloc_system)]
 extern crate alloc_system;
 
-extern crate accel_mma84;
+extern crate climate_si7020;
 extern crate tessel;
 
-use accel_mma84::Accelerometer;
+use climate_si7020::Climate;
 use tessel::Tessel;
 use std::thread::sleep;
 use std::time::Duration;
@@ -15,12 +15,12 @@ fn main() {
     let (mut port_a, _) = Tessel::ports().unwrap();
 
     // Create the accelerometer object and connect to the sensor.
-    let mut acc = Accelerometer::new(port_a);
-    acc.connect().expect("Could not connect to accelerometer.");
+    let mut climate = Climate::new(port_a);
+    climate.connect().expect("Could not connect to climate sensor.");
 
-    println!("Reading acceleration sensor... (Press CTRL + C to stop)");
+    println!("Reading climate sensor... (Press CTRL + C to stop)");
     loop {
-        println!("Acceleration (x, y, z): {:?}", acc.read_acceleration());
+        println!("Temperature (Fahrenheit): {:?}", climate.read_temperature());
 
         // Continue the loop after sleeping for 100ms.
         sleep(Duration::from_millis(100));

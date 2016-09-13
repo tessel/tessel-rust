@@ -1,12 +1,12 @@
 [package]
-name = "accel-mma84"
-version = "0.2.0"
+name = "climate-si7020"
+version = "0.1.0"
 authors = ["Tim Ryan <tim@tessel.io>"]
-description = "Driver for an MMA8452Q 3-axis accelerometer."
+description = "Driver for an SI7020 temperature and humidity sensor."
 license = "MIT"
 
 [[bin]]
-name = "tessel-accel"
+name = "tessel-climate"
 doc = false
 
 [dependencies]

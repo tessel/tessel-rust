@@ -13,6 +13,9 @@ fn main() {
     // Create a new Tessel
     let mut tessel = Tessel::new();
 
+    // Attempt to acquire Tessel ports.
+    let (_a, _b) = Tessel::ports().expect("Could not acquire Tessel ports.");
+
     // Turn on one of the LEDs
     tessel.led[2].on().unwrap();
 

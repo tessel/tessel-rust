@@ -7,9 +7,9 @@ use std::io;
 
 #[repr(u8)]
 pub enum ScaleRange {
-    Scale2G = 0x00,
-    Scale4G = 0x01,
-    Scale8G = 0x10,
+    Scale2G = 0b00,
+    Scale4G = 0b01,
+    Scale8G = 0b10,
 }
 
 #[repr(u8)]
@@ -22,13 +22,9 @@ enum Command {
     CtrlReg4 = 0x2D,
 }
 
-pub struct Accelerometer<'a> {
-    i2c: tessel::I2C<'a>,
-}
-
 #[repr(u8)]
 #[allow(non_camel_case_types)]
-pub enum OutputRate {
+pub enum SampleRate {
     Rate800 = 0,
     Rate400 = 1,
     Rate200 = 2,
@@ -41,10 +37,22 @@ pub enum OutputRate {
 
 const I2C_ID: u8 = 0x1d;
 
+#[allow(dead_code)]
+pub struct Accelerometer<'a> {
+    i2c: tessel::I2cPort<'a>,
+    i1: tessel::Pin<'a>,
+    i2: tessel::Pin<'a>,
+}
+
 impl<'a> Accelerometer<'a> {
-    pub fn new<'b>(i2c: tessel::I2C<'b>) -> Accelerometer<'b> {
+    pub fn new<'b>(port: tessel::Port) -> Accelerometer<'b> {
+        let (i2c, gpio) = port.i2c();
+        let (i1, i2) = gpio.pin_select((5, 6));
+
         Accelerometer {
             i2c: i2c,
+            i1: i1,
+            i2: i2,
         }
     }
 
@@ -71,7 +79,7 @@ impl<'a> Accelerometer<'a> {
         }
 
         try!(self.set_scale_range(ScaleRange::Scale2G));
-        try!(self.set_output_rate(OutputRate::Rate1_56));
+        try!(self.set_sample_rate(SampleRate::Rate100));
 
         Ok(())
     }
@@ -96,7 +104,7 @@ impl<'a> Accelerometer<'a> {
         Ok(())
     }
 
-    pub fn set_output_rate(&mut self, rate: OutputRate) -> io::Result<()> {
+    pub fn set_sample_rate(&mut self, rate: SampleRate) -> io::Result<()> {
         try!(self.standby_enable());
 
         // Clear the three bits of output rate control (0b11000111 = 199)
