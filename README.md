@@ -6,6 +6,13 @@ Looking to do some Rust development on Tessel? You’ve found the right place. T
 
 **Get in touch**: the team working on Rust for Tessel is all on the #rust-lang channel of the [Tessel Slack ![](https://tessel-slack.herokuapp.com/badge.svg)](https://tessel-slack.herokuapp.com/). Join the conversation!
 
+**Documentation:**
+
+* **[`tessel` crate](https://docs.rs/tessel/)**
+* [`accel-mma84` crate](https://docs.rs/accel-mma84/)
+* [`climate-si7020` crate](https://docs.rs/climate-si7020/)
+* [`ble` crate](https://docs.rs/ble/)
+
 ## Quickstart (using remote compilation)
 
 Tessel requires `node` 4.x and `git`. If you haven't yet, install the Tessel 2 CLI using `npm install t2-cli -g`.
