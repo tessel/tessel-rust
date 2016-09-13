@@ -8,11 +8,10 @@ use accel_mma84::Accelerometer;
 use tessel::Tessel;
 use std::thread::sleep;
 use std::time::Duration;
-use std::io::prelude::*;
 
 fn main() {
     // Acquire port A.
-    let (mut port_a, _) = Tessel::ports().unwrap();
+    let (port_a, _) = Tessel::ports().unwrap();
 
     // Create the accelerometer object and connect to the sensor.
     let mut acc = Accelerometer::new(port_a);
