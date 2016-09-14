@@ -19,18 +19,17 @@ fn main() {
 
     println!("Toggling relays every 1s... (Press CTRL + C to stop)");
     loop {
-        // Continue the loop after sleeping for 100ms.
         println!("[0, 0]");
-        sleep(Duration::from_millis(1000));
+        sleep(Duration::from_millis(3000));
         servos.set_latch(1, true);
         println!("[1, 0]");
-        sleep(Duration::from_millis(1000));
+        sleep(Duration::from_millis(3000));
         servos.set_latch(2, true);
         println!("[1, 1]");
-        sleep(Duration::from_millis(1000));
+        sleep(Duration::from_millis(3000));
         servos.set_latch(1, false);
         println!("[0, 0]");
-        sleep(Duration::from_millis(1000));
+        sleep(Duration::from_millis(3000));
         servos.set_latch(2, false);
     }
 }
