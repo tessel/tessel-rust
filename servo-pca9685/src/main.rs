@@ -23,10 +23,10 @@ fn main() {
 
         // Continue the loop after sleeping for 100ms.
         println!("1");
-        servos.set_duty_cycle(0, 1.0);
+        servos.set_duty_cycle(1, 1.0);
         sleep(Duration::from_millis(1000));
         println!("2");
-        servos.set_duty_cycle(0, 0.0);
+        servos.set_duty_cycle(1, 0.0);
         sleep(Duration::from_millis(1000));
     }
 }
