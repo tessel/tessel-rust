@@ -196,6 +196,14 @@ impl<'a> Pin<'a> {
             sock.write_command(Command::GpioLow(self.index as u8))
         }
     }
+
+    pub fn high(&mut self) -> io::Result<()> {
+        self.output(true)
+    }
+
+    pub fn low(&mut self) -> io::Result<()> {
+        self.output(false)
+    }
 }
 
 /// An I2C Port.
