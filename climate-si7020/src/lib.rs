@@ -1,8 +1,5 @@
 //! https://www.silabs.com/Support%20Documents%2FTechnicalDocs%2FSi7020-A20.pdf
 
-#![feature(alloc_system)]
-extern crate alloc_system;
-
 extern crate tessel;
 
 use std::io;

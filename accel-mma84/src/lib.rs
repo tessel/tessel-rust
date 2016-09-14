@@ -1,5 +1,4 @@
-#![feature(alloc_system)]
-extern crate alloc_system;
+//! https://cdn.sparkfun.com/datasheets/Sensors/Accelerometers/MMA8452Q-rev8.1.pdf
 
 extern crate tessel;
 

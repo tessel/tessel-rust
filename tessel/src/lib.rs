@@ -1,3 +1,5 @@
+//! Tessel API and crate.
+
 #[macro_use] extern crate lazy_static;
 extern crate atomic_option;
 extern crate unix_socket;
