@@ -1,0 +1,36 @@
+#![feature(alloc_system)]
+extern crate alloc_system;
+
+extern crate relay_mono;
+extern crate tessel;
+
+use relay_mono::RelayArray;
+use tessel::Tessel;
+use std::thread::sleep;
+use std::time::Duration;
+
+fn main() {
+    // Acquire port A.
+    let (port_a, _) = Tessel::ports().unwrap();
+
+    // Create the relay array.
+    let mut servos = RelayArray::new(port_a);
+    servos.connect().expect("Could not connect to relay array.");
+
+    println!("Toggling relays every 1s... (Press CTRL + C to stop)");
+    loop {
+        // Continue the loop after sleeping for 100ms.
+        println!("[0, 0]");
+        sleep(Duration::from_millis(1000));
+        servos.set_latch(1, true);
+        println!("[1, 0]");
+        sleep(Duration::from_millis(1000));
+        servos.set_latch(2, true);
+        println!("[1, 1]");
+        sleep(Duration::from_millis(1000));
+        servos.set_latch(1, false);
+        println!("[0, 0]");
+        sleep(Duration::from_millis(1000));
+        servos.set_latch(2, false);
+    }
+}
