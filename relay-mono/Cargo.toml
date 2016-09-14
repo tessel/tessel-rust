@@ -1,0 +1,13 @@
+[package]
+name = "relay-mono"
+version = "0.1.0"
+authors = ["Tim Ryan <tim@tessel.io>"]
+description = "Driver for a Tessel Relay module."
+license = "MIT"
+
+[[bin]]
+name = "tessel-relay"
+doc = false
+
+[dependencies]
+tessel = { path = "../tessel", version = "0.3.0" }
