@@ -10,8 +10,10 @@ Looking to do some Rust development on Tessel? You’ve found the right place. T
 
 * **[`tessel` crate](https://docs.rs/tessel/)**
 * [`accel-mma84` crate](https://docs.rs/accel-mma84/)
-* [`climate-si7020` crate](https://docs.rs/climate-si7020/)
 * [`ble` crate](https://docs.rs/ble/)
+* [`climate-si7020` crate](https://docs.rs/climate-si7020/)
+* [`relay-mono` crate](https://docs.rs/relay-mono/)
+* [`servo-pca9685` crate](https://docs.rs/servo-pca9685/)
 
 ## Quickstart (using remote compilation)
 

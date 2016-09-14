@@ -101,7 +101,7 @@ impl<'a> ServoArray<'a> {
 
     /// Set duty cycle for entry 1 to 16.
     pub fn set_duty_cycle(&mut self, i: usize, value: f64) {
-        let offset = (i - 1) * 4;
+        let offset = ((i - 1) * 4) as u8;
         let reg = (((MAX - 1) as f64) * f64::max(f64::min(value, 1.0), 0.0)) as u16;
         println!("0 0 {:?} {:?}", (reg & 0xFF) as u8, ((reg >> 8) & 0xFF) as u8);
         self.i2c.send(self.i2c_id, &[Command::LED0_ON_L as u8 + offset, 0]);
