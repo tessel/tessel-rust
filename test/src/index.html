@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html>
-<title>Acceleration</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.14.0/axios.min.js"></script>
+<title>Acceleration Visualizer</title>
 <style>
 
 body{
@@ -65,16 +64,47 @@ body{
 </body>
 <script>
 
+function avg(arr) {
+  var res = 0;
+  for (var i = 0; i < arr.length; i++) {
+    res += arr[i];
+  }
+  return res / arr.length;
+}
+
+var vec = {x: [], y: [], z: []};
+
+function addData(data) {
+  var trail = 10;
+
+  vec.x.push(data.x);
+  vec.x = vec.x.slice(-trail);
+  vec.y.push(data.y);
+  vec.y = vec.y.slice(-trail);
+  vec.z.push(data.z);
+  vec.z = vec.z.slice(-trail);
+
+  return {x: avg(vec.x), y: avg(vec.y), z: avg(vec.z)};
+}
+
+var source = new EventSource('/api/acceleration');
+
+source.addEventListener('message', function(e) {
+  document.querySelector('#dump').innerText = e.data;
+  // document.querySelector('#dump').innerText = JSON.stringify(vec);
+
+  var res = addData(JSON.parse(e.data));
+  document.querySelector('#cube').style.transform =
+    'rotateX(' + (res.y*Math.PI) + 'rad) ' +
+    'rotateY(' + (res.z*Math.PI) + 'rad) ' +
+    'rotateZ(' + (-res.x*Math.PI) + 'rad) ' +
+    'translateZ(-100px)';
+}, false);
+
 function loop () {
   axios.get('/api/acceleration')
   .then(function (response) {
-    response.data.x
-    document.querySelector('#dump').innerText = JSON.stringify(response.data);
-    document.querySelector('#cube').style.transform =
-      'rotateX(' + (response.data.y*Math.PI) + 'rad) ' +
-      'rotateY(' + (response.data.z*Math.PI) + 'rad) ' +
-      'rotateZ(' + (-response.data.x*Math.PI) + 'rad) ' +
-      'translateZ(-100px)';
+
     setTimeout(loop, 0);
   })
   .catch(function (error) {
