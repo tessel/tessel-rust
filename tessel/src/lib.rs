@@ -107,6 +107,17 @@ impl Port {
         }
         (I2cPort::new(self.socket.clone()), Gpio::new(self.socket.clone(), available))
     }
+
+    pub fn spi<'b>(self) -> (SpiPort<'b>, Gpio<'b>) {
+        let mut available = BitSet::new();
+        for i in 0..2 {
+            available.insert(i);
+        }
+        for i in 5..8 {
+            available.insert(i);
+        }
+        (SpiPort::new(self.socket.clone()), Gpio::new(self.socket.clone(), available))
+    }
 }
 
 /// Gpio is a selection of pins.
@@ -299,6 +310,128 @@ impl<'p> I2cPort<'p> {
         let mut sock = self.socket.lock().unwrap();
         I2cPort::tx(&mut sock, address, write_buf);
         I2cPort::rx(&mut sock, address, read_buf);
+        I2cPort::stop(&mut sock);
+
+        // TODO: this is not how async reads should be handled.
+        // Read in first byte.
+        let mut read_byte = [0];
+        try!(sock.read_exact(&mut read_byte));
+        assert_eq!(read_byte[0], reply::DATA.0);
+        // Read in data from the socket
+        return sock.read_exact(read_buf);
+    }
+}
+
+
+/// A SPI Port.
+pub struct SpiPort<'a> {
+    socket: Arc<Mutex<PortSocket>>,
+    _phantom: PhantomData<&'a Port>,
+}
+
+impl<'p> SpiPort<'p> {
+    // TODO: make frequency optional
+    fn new<'a>(socket: Arc<Mutex<PortSocket>>) -> SpiPort<'a> {
+        let mut spi = SpiPort {
+            socket: socket,
+            _phantom: PhantomData,
+        };
+
+        // Use 1Mhz as default frequency.
+        let (reg, div) = SpiPort::compute_baud(1_000_000);
+        spi.enable(0, reg, div);
+
+        spi
+    }
+
+    /// Computes the baudrate as used on the Atmel SAMD21 SPI register
+    /// to set the frequency of the SPI Clock. Returns (register, divisor)
+    fn compute_baud(frequency: u32) -> (u8, u8) {
+        // spi baud rate is set by the following equation:
+        //  f_baud = f_ref/(2*(baud_reg+1))
+
+        // Max baud rate is 24MHz for the SAMD21, min baud rate is 93750 without a clock divisor.
+        // With a max clock divisor of 255, slowest clock is 368Hz.
+        // (If we switch from 48MHz xtal to 32KHz xtal, this assumption changes.)
+        if (frequency < 368 || frequency > 24_000_000) {
+            panic!("SPI clock must be between 368Hz and 24MHz");
+        }
+
+        let reg: u32 = (48_000_000 / (2 * frequency)) - 1;
+
+        // if speed is slower than 93750 then we need a clock divisor.
+        // Find the smallest clock divider such that reg is <= 255.
+        if reg > 255 {
+            // find the clock divider, make sure its at least 1
+            let div = 48_000_000 / (frequency * (2 * 255 + 2));
+            if div == 0 {
+                div = 1;
+            }
+
+            // if the speed is still too low, set the clock divider to max and set baud accordingly
+            if div > 255 {
+                let reg = (frequency / 255);
+                if reg == 0 {
+                    reg = 1;
+                }
+                (reg, 255)
+            } else {
+                // if we can set a clock divider < 255, max out register.
+                (reg, div)
+            }
+        } else {
+            // divider == 1
+            (reg, 1)
+        }
+    }
+
+    fn enable(&mut self, mode: u8, reg: u8, div: u8) {
+        let mut sock = self.socket.lock().unwrap();
+        sock.write_command(Command::EnableSpi {
+            mode: mode,
+            freq: freq,
+            div: div,
+        }).unwrap();
+    }
+
+    fn tx(sock: &mut MutexGuard<PortSocket>, write_buf: &[u8]) {
+        // Write the command and data
+        sock.write_command(Command::Tx(write_buf)).unwrap();
+    }
+
+    fn rx(sock: &mut MutexGuard<PortSocket>, read_buf: &mut [u8]) {
+        // Write the command and transfer length
+        sock.write_command(Command::Rx(read_buf.len() as u8)).unwrap();
+    }
+
+    pub fn set_frequency(&mut self, frequency: u32) {
+        // Use 1Mhz as default frequency.
+        let (reg, div) = SpiPort::compute_baud(frequency);
+        self.enable(0, reg, div);
+    }
+
+    pub fn send(&mut self, address: u8, write_buf: &[u8]) {
+        let mut sock = self.socket.lock().unwrap();
+        I2cPort::tx(&mut sock, write_buf);
+    }
+
+    pub fn read(&mut self, address: u8, read_buf: &mut [u8]) -> io::Result<()> {
+        let mut sock = self.socket.lock().unwrap();
+        I2cPort::rx(&mut sock, read_buf);
+
+        // TODO: this is not how async reads should be handled.
+        // Read in first byte.
+        let mut read_byte = [0];
+        try!(sock.read_exact(&mut read_byte));
+        assert_eq!(read_byte[0], reply::DATA.0);
+        // Read in data from the socket
+        return sock.read_exact(read_buf);
+    }
+
+    pub fn transfer(&mut self, address: u8, write_buf: &[u8], read_buf: &mut [u8]) -> io::Result<()> {
+        let mut sock = self.socket.lock().unwrap();
+        I2cPort::tx(&mut sock, write_buf);
+        I2cPort::rx(&mut sock, read_buf);
         I2cPort::stop(&mut sock);
 
         // TODO: this is not how async reads should be handled.
