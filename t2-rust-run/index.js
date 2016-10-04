@@ -13,6 +13,21 @@ var createHash = require('sha.js')
 var Transform = require('stream').Transform;
 var spawn = require('child_process').spawn;
 
+var myPlatform = 'macos';
+
+var paths = {
+  sdk: path.join(osenv.home(), '.tessel/sdk'),
+  rustlib: path.join(osenv.home(), '.tessel/rust/rustlib'),
+  rustTarget: path.join(osenv.home(), '.tessel/rust/tessel2.json'),
+};
+
+var sdkPath = {
+  'macos': 'https://builds.tessel.io/t2/sdk/t2-sdk-macos-x86_64.tar.bz2',
+  'linux': 'https://builds.tessel.io/t2/sdk/t2-sdk-linux-x86_64.tar.bz2',
+};
+
+var rustlibUrl = 'https://builds.tessel.io/t2/sdk/t2-rustlib-VERSION.tar.gz';
+
 var rustVersion = exports.rustVersion = () => {
   return new Promise((resolve, reject) => {
     var rustc = spawn('rustc', ['-V'])
@@ -62,22 +77,7 @@ function tmpdir() {
   });
 }
 
-var myPlatform = 'macos';
-
-var paths = {
-  sdk: path.join(osenv.home(), '.tessel/sdk'),
-  rustlib: path.join(osenv.home(), '.tessel/rust/rustlib'),
-  rustTarget: path.join(osenv.home(), '.tessel/rust/tessel2.json'),
-};
-
-var sdkPath = {
-  'macos': 'https://builds.tessel.io/t2/sdk/t2-sdk-macos-x86_64.tar.bz2',
-  'linux': 'https://builds.tessel.io/t2/sdk/t2-sdk-linux-x86_64.tar.bz2',
-};
-
-var rustlibUrl = 'https://builds.tessel.io/t2/sdk/t2-rustlib-VERSION.tar.gz';
-
-function toolchainPath() {
+var toolchainPath = exports.toolchainPath = () => {
   return fs.readdirAsync(path.join(paths.sdk, myPlatform))
     .then((values) => new Promise((resolve, reject) => {
       for (var i = 0; i < values.length; i++) {
@@ -91,46 +91,54 @@ function toolchainPath() {
 
 // Checks is CHECKSUM file in our SDK equals our expected checksum.
 // This will resolve with checking that the SDK exists and matches the checksum.
-function checkSdk(checksumVerify) {
-  return fs.readFileAsync(path.join(paths.sdk, myPlatform, "CHECKSUM"))
+var checkSdk = exports.checkSdk = (checksumVerify) => {
+  var dir = path.join(paths.sdk, myPlatform);
+  return fs.readFileAsync(path.join(dir, "CHECKSUM"))
   .then((checksum) => ({
     exists: true,
-    valid: checksumVerify == checksum,
+    checked: checksumVerify == checksum,
+    path: dir,
   }), (_) => ({
     exists: false,
-    valid: false
+    checked: false,
+    path: dir,
   }))
 }
 
-function checkRustlib(rustv, checksumVerify) {
-  return fs.readFileAsync(path.join(paths.rustlib, rustv, "CHECKSUM"))
+var checkRustlib = exports.checkRustlib = (rustv, checksumVerify) => {
+  var dir = path.join(paths.rustlib, rustv)
+  return fs.readFileAsync(path.join(dir, "CHECKSUM"))
   .then((checksum) => ({
     exists: true,
-    valid: checksumVerify == checksum,
+    checked: checksumVerify == checksum,
+    path: dir,
   }), (_) => ({
     exists: false,
-    valid: false
+    checked: false,
+    path: dir,
   }))
 }
 
-function checkRustTarget(checksumVerify) {
+var checkRustTarget = exports.checkRustTarget = (checksumVerify) => {
+  var file = paths.rustTarget;
   return new Promise((resolve, reject) => {
-    try {
-      fs.createReadStream(paths.rustTarget)
-      .pipe(sha256stream())
-      .on('sha256', (checksum) => {
-        checksum = checksum + '  ' + path.basename(paths.rustTarget) + '\n';
-        resolve({
-          exists: true,
-          valid: checksumVerify == checksum,
-        })
-      });
-    } catch (e) {
+    fs.createReadStream(file)
+    .on('error', function () {
       resolve({
         exists: false,
-        valid: false,
+        checked: false,
+        path: file,
       })
-    }
+    })
+    .pipe(sha256stream())
+    .on('sha256', (checksum) => {
+      checksum = checksum + '  ' + path.basename(file) + '\n';
+      resolve({
+        exists: true,
+        checked: checksumVerify == checksum,
+        path: file,
+      })
+    })
   });
 }
 
@@ -144,7 +152,7 @@ var installSdk = exports.installSdk = () => {
     return checkSdk(checksumVerify);
   })
   .then((check) => {
-    if (check.exists && check.valid) {
+    if (check.exists && check.checked) {
       console.error('Latest SDK already installed.');
       return;
     } else if (!check.exists) {
@@ -180,7 +188,7 @@ var installRustlib = exports.installRustlib = (next) => {
     return checkRustlib(rustv, checksumVerify);
   })
   .then((check) => {
-    if (check.exists && check.valid) {
+    if (check.exists && check.checked) {
       console.error(`Latest ${pkgname} already installed.`);
       return;
     } else if (!check.exists) {
@@ -204,7 +212,7 @@ var installRustTarget = exports.installRustTarget = (next) => {
     return checkRustTarget(checksumVerify);
   })
   .then((check) => {
-    if (check.exists && check.valid) {
+    if (check.exists && check.checked) {
       console.error('Latest target.json already installed.');
       return;
     } else if (!check.exists) {
