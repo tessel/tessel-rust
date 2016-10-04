@@ -61,9 +61,14 @@ rust.rustVersion()
 
   cargo.on('close', (code) => {
     console.error(`cargo exited with code ${code}`);
-    process.on('exit', () => {
-      process.exit(code);
-    });
+    if (code != 0) {
+      process.on('exit', () => {
+        process.exit(code);
+      });
+    }
+
+    console.error('');
+    console.error('TODO: bundle up archive, deploy to Tessel');
   });
 }, (e) => {
   console.error('Could not find all the components for cross-compiling Rust.')
