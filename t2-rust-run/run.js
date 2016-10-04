@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+var rust = require('./');
 var spawn = require('child_process').spawn;
 var path = require('path');
 
