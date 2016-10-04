@@ -11,6 +11,22 @@ var tmp = require('tmp');
 var zlib = require('zlib');
 var Promise = require('bluebird');
 var Progress = require('progress');
+var createHash = require('sha.js')
+var Transform = require('stream').Transform;
+
+function sha256stream() {
+  var sha256 = createHash('sha256');
+  var stream = new Transform();
+  stream._transform = function (chunk, encoding, callback) {
+    this.push(chunk);
+    sha256.update(chunk);
+    callback();
+  };
+  stream.on('finish', function () {
+    stream.emit('sha256', sha256.digest('hex'));
+  });
+  return stream;
+}
 
 function tmpdir() {
   return new Promise((resolve, reject) => {
@@ -54,120 +70,135 @@ function toolchainPath() {
     }));
 }
 
-function rustlibPath() {
-  return fs.readdirAsync(paths.rustlib)
-    .then((_) => paths.rustlib);
+// Checks is CHECKSUM file in our SDK equals our expected checksum.
+// This will resolve with checking that the SDK exists and matches the checksum.
+function checkSdk(checksumVerify) {
+  return fs.readFileAsync(path.join(paths.sdk, myPlatform, "CHECKSUM"))
+  .then((checksum) => ({
+    exists: true,
+    valid: checksumVerify == checksum,
+  }), (_) => ({
+    exists: false,
+    valid: false
+  }))
 }
 
-function rustTargetPath() {
-  return fs.readFileAsync(paths.rustTarget)
-    .then((_) => paths.rustTarget);
+function checkRustlib(checksumVerify) {
+  return fs.readFileAsync(path.join(paths.rustlib, "1.12.0", "CHECKSUM"))
+  .then((checksum) => ({
+    exists: true,
+    valid: checksumVerify == checksum,
+  }), (_) => ({
+    exists: false,
+    valid: false
+  }))
 }
 
-function sdkExists() {
-  return toolchainPath()
-  .then((path) => true)
-  .catch(() => false)
-}
-
-function rustlibExists() {
-  return rustlibPath()
-  .then((path) => true)
-  .catch(() => false)
-}
-
-function rustTargetExists() {
-  return rustTargetPath()
-  .then((path) => true)
-  .catch(() => false)
+function checkRustTarget(checksumVerify) {
+  return new Promise((resolve, reject) => {
+    try {
+      fs.createReadStream(paths.rustTarget)
+      .pipe(sha256stream())
+      .on('sha256', (checksum) => {
+        checksum = checksum + '  ' + path.basename(paths.rustTarget) + '\n';
+        resolve({
+          exists: true,
+          valid: checksumVerify == checksum,
+        })
+      });
+    } catch (e) {
+      resolve({
+        exists: false,
+        valid: false,
+      })
+    }
+  });
 }
 
 function installSdk() {
-  console.log('Installing SDK...');
-  return sdkExists()
-  .then(function (exists) {
-    if (exists) {
-      console.log('(SDK already installed.)')
+  var url = sdkPath[myPlatform];
+  var checksumVerify = null;
+
+  return downloadString(url + '.sha256')
+  .then((checksum) => {
+    checksumVerify = checksum;
+    return checkSdk(checksumVerify);
+  })
+  .then((check) => {
+    if (check.exists && check.valid) {
+      console.error('Latest SDK already installed.');
+      return;
+    } else if (!check.exists) {
+      console.error('Installing SDK...')
     } else {
-      return fs.mkdirpAsync(path.join(osenv.home(), '.tessel/sdk'))
-        .then(() => extractSdk(download(sdkPath[myPlatform])));
+      console.error('Updating SDK...')
     }
+
+    return fs.mkdirpAsync(path.join(osenv.home(), '.tessel/sdk'))
+      .then(() => extractSdk(checksumVerify, path.basename(url), download(url)));
   });
 }
 
 function installRustlib(next) {
-  console.log('Installing rustlib...');
-  return rustlibExists()
-  .then(function (exists) {
-    if (exists) {
-      console.log('(Rustlib already installed.)')
+  var url = rustlibUrl;
+  var checksumVerify = null;
+
+  return downloadString(url + '.sha256')
+  .then((checksum) => {
+    checksumVerify = checksum;
+    return checkRustlib(checksumVerify);
+  })
+  .then((check) => {
+    if (check.exists && check.valid) {
+      console.error('Latest MIPS libstd already installed.');
+      return;
+    } else if (!check.exists) {
+      console.error('Installing MIPS libstd...')
     } else {
-      return fs.mkdirpAsync(path.join(osenv.home(), '.tessel/rust/rustlib'))
-        .then(() => extractRustlib(download(rustlibUrl), '1.12.0'))
+      console.error('Updating MIPS libstd...')
     }
+
+    return fs.mkdirpAsync(path.join(osenv.home(), '.tessel/rust/rustlib'))
+      .then(() => extractRustlib(checksumVerify, path.basename(url), download(url), '1.12.0'))
   });
 }
 
 function installRustTarget(next) {
-  console.log('Installing rust target...');
-  return fs.mkdirpAsync(path.join(osenv.home(), '.tessel/rust'))
-    .then(() => new Promise((resolve, reject) => {
-      download('http://builds.tessel.io/t2/sdk/tessel2.json')
-      .pipe(fs.createWriteStream(path.join(osenv.home(), '.tessel/rust/tessel2.json')))
-      .on('finish', resolve)
-      .on('error', reject)
-    }))
-}
+  var url = 'http://builds.tessel.io/t2/sdk/tessel2.json';
+  var checksumVerify = null;
 
-function extractRustlib(sdkStream, rustVersion) {
-  console.log('Downloading rustlib...');
-
-  var root = path.join(osenv.home(), '.tessel/rust/rustlib', rustVersion);
-
-  return tmpdir()
-  .then((destdir) => {
-    // Exract tarball to destination.
-    var extract = tar.extract(destdir.path, {
-      strip: 0,
-      ignore: function(name) {
-        // Ignore self-directory.
-        return path.normalize(name + '/') == path.normalize(destdir.path + '/');
-      }
-    });
-
-    function tryCleanup() {
-      try {
-        destdir.cleanup();
-      } catch (e) { }
+  return downloadString(url + '.sha256')
+  .then((checksum) => {
+    checksumVerify = checksum;
+    return checkRustTarget(checksumVerify);
+  })
+  .then((check) => {
+    if (check.exists && check.valid) {
+      console.error('Latest target.json already installed.');
+      return;
+    } else if (!check.exists) {
+      console.error('Installing target.json...')
+    } else {
+      console.error('Updating target.json...')
     }
 
-    return new Promise((resolve, reject) => {
-      sdkStream
-        .pipe(zlib.createGunzip())
-        .pipe(blocks({ size: 64*1024, zeroPadding: false }))
-        .pipe(extract)
-        .on('finish', function () {
-          // Remove the old SDK directory.
-          fs.removeAsync(root)
-          .then(() => {
-            // Move temporary directory to target destination.
-            fs.moveAsync(destdir.path, root)
-          })
-          .finally(() => {
-            tryCleanup();
-          })
-          .then(resolve)
-          .catch(reject);
-        })
-        .on('error', function (err) {
-          tryCleanup();
-          reject(err);
-        })
+    return fs.mkdirpAsync(path.join(osenv.home(), '.tessel/rust'))
+      .then(() => downloadString(url))
+      .then((target) => {
+        var sha256 = createHash('sha256');
+        var checksum = sha256.update(target).digest('hex') + '  ' + path.basename(url) + '\n';
+
+        // Check sum.
+        if (checksum != checksumVerify) {
+          throw new Error('Checksum for downloaded target.json does not match!');
+        }
+
+        fs.writeFileSync(path.join(osenv.home(), '.tessel/rust/tessel2.json'), target);
       });
   });
 }
 
-function extractSdk(sdkStream) {
+function extractSdk(checksumVerify, filename, sdkStream) {
   console.log('Downloading SDK...');
 
   var root = path.join(osenv.home(), '.tessel/sdk', 'macos');
@@ -190,11 +221,24 @@ function extractSdk(sdkStream) {
     }
 
     return new Promise((resolve, reject) => {
+      var checksum = '';
       sdkStream
+        .pipe(sha256stream())
+        .on('sha256', function (sha256) {
+          checksum = sha256 + '  ' + filename + '\n';
+        })
         .pipe(bz2())
         .pipe(blocks({ size: 64*1024, zeroPadding: false }))
         .pipe(extract)
         .on('finish', function () {
+          // Check sum.
+          if (checksum != checksumVerify) {
+            return reject(new Error('Checksum for downloaded SDK does not match!'));
+          }
+
+          // Write out CHECKSUM file.
+          fs.writeFileSync(path.join(destdir.path, "CHECKSUM"), checksum);
+
           // Remove the old SDK directory.
           fs.removeAsync(root)
           .then(() => {
@@ -212,6 +256,79 @@ function extractSdk(sdkStream) {
           reject(err);
         })
       });
+  });
+}
+
+function extractRustlib(checksumVerify, filename, sdkStream, rustVersion) {
+  console.log('Downloading MIPS libstd...');
+
+  var root = path.join(osenv.home(), '.tessel/rust/rustlib', rustVersion);
+
+  return tmpdir()
+  .then((destdir) => {
+    // Exract tarball to destination.
+    var extract = tar.extract(destdir.path, {
+      strip: 0,
+      ignore: function(name) {
+        // Ignore self-directory.
+        return path.normalize(name + '/') == path.normalize(destdir.path + '/');
+      }
+    });
+
+    function tryCleanup() {
+      try {
+        destdir.cleanup();
+      } catch (e) { }
+    }
+
+    return new Promise((resolve, reject) => {
+      var checksum = '';
+      sdkStream
+        .pipe(sha256stream())
+        .on('sha256', function (sha256) {
+          checksum = sha256 + '  ' + filename + '\n';
+        })
+        .pipe(zlib.createGunzip())
+        .pipe(blocks({ size: 64*1024, zeroPadding: false }))
+        .pipe(extract)
+        .on('finish', function () {
+          // Check sum.
+          if (checksum != checksumVerify) {
+            return reject(new Error('Checksum for downloaded MIPS libstd does not match!'));
+          }
+
+          // Write out CHECKSUM file.
+          fs.writeFileSync(path.join(destdir.path, "CHECKSUM"), checksum);
+
+          // Remove the old SDK directory.
+          fs.removeAsync(root)
+          .then(() => {
+            // Move temporary directory to target destination.
+            fs.moveAsync(destdir.path, root)
+          })
+          .finally(() => {
+            tryCleanup();
+          })
+          .then(resolve)
+          .catch(reject);
+        })
+        .on('error', function (err) {
+          tryCleanup();
+          reject(err);
+        })
+      });
+  });
+}
+
+function downloadString(url) {
+  return new Promise((resolve, reject) => {
+    request(url, (error, response, body) => {
+      if (!error && response.statusCode == 200) {
+        resolve(body);
+      } else {
+        reject(error || response.statusCode);
+      }
+    })
   });
 }
 
