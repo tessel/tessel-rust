@@ -42,6 +42,58 @@ rust.rustVersion()
 .then((_toolchainPath) => {
   toolchainPath = _toolchainPath;
 
+  return new Promise((resolve, reject) => {
+    var cargo = spawn('cargo', ['metadata', '--no-deps'], {
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+
+    var buffers = [];
+    cargo.stdout.on('data', data => buffers.push(data));
+    cargo.stdout.on('finish', () => {
+      var metadata = JSON.parse(Buffer.concat(buffers).toString());
+
+      // Get first package.
+      var pkg = metadata.packages.pop();
+      var bins = pkg.targets.filter(target => target.kind.indexOf('bin') > -1);
+
+      // Filter by --bin argument.
+      var idx = process.argv.indexOf('--bin');
+      var name = idx > -1 ? process.argv[idx + 1] : null;
+      var validbins = bins;
+      if (name != null) {
+        validbins = validbins.filter(bin => bin.name == process.argv[idx + 1]);
+      }
+
+      // Throw if multiple bins exist.
+      if (validbins.length == 0) {
+        if (name) {
+          console.error(`No binary target "${name}" exists for this Rust crate.\nMake sure you specify a valid binary using --bin. e.g.:`)
+          bins.forEach(bin => {
+            console.error('    t2 run Cargo.toml --bin', bin.name);
+          })
+        } else {
+          console.error('No binary targets exist for this Rust crate.\nPlease add a binary and try again.')
+        }
+        process.exit(1);
+      }
+      if (validbins.length > 1) {
+        console.error('Multiple binary targets exist for this Rust crate.\nPlease specify one by name with --bin. e.g.:')
+        bins.forEach(bin => {
+          console.error('    t2 run Cargo.toml --bin', bin.name);
+        })
+        process.exit(1);
+      }
+
+      var out = validbins[0];
+      var dest = path.join(path.dirname(pkg.manifest_path), 'target/tessel2/release', out.name);
+      resolve({
+        name: out.name,
+        path: dest
+      });
+    })
+  });
+})
+.then((dest) => {
   var env = Object.assign({}, process.env);
   Object.assign(env, {
     STAGING_DIR: stagingDir,
@@ -50,7 +102,7 @@ rust.rustVersion()
     RUSTFLAGS: "-L " + rustlibPath,
   });
 
-  var cargo = spawn('cargo', ['build', '--target=tessel2'], {
+  var cargo = spawn('cargo', ['build', '--target=tessel2', '--bin', dest.name, '--release'], {
     env: env,
     stdio: ['ignore', 'inherit', 'inherit'],
   });
@@ -60,15 +112,14 @@ rust.rustVersion()
   });
 
   cargo.on('close', (code) => {
-    console.error(`cargo exited with code ${code}`);
     if (code != 0) {
       process.on('exit', () => {
         process.exit(code);
       });
     }
 
-    console.error('');
-    console.error('TODO: bundle up archive, deploy to Tessel');
+    console.log('TODO: copy this file to tessel and run it:');
+    console.log(dest.path);
   });
 }, (e) => {
   console.error('Could not find all the components for cross-compiling Rust.')
