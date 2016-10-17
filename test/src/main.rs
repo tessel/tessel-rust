@@ -1,7 +1,3 @@
-// Needed for execution on Tessel.
-#![feature(alloc_system)]
-extern crate alloc_system;
-
 #[macro_use] extern crate nickel;
 extern crate accel_mma84;
 extern crate local_ip;
