@@ -1,6 +1,3 @@
-#![feature(alloc_system)]
-extern crate alloc_system;
-
 extern crate servo_pca9685;
 extern crate tessel;
 

@@ -1,6 +1,3 @@
-#![feature(alloc_system)]
-extern crate alloc_system;
-
 /// A blinky example for Tessel
 
 extern crate tessel;

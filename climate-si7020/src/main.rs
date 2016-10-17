@@ -1,6 +1,3 @@
-#![feature(alloc_system)]
-extern crate alloc_system;
-
 extern crate climate_si7020;
 extern crate tessel;
 
