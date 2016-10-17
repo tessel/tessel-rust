@@ -2,9 +2,11 @@
 
 [![Code of Conduct](https://img.shields.io/badge/%E2%9D%A4-code%20of%20conduct-blue.svg?style=flat)](https://github.com/tessel/project/blob/master/CONDUCT.md)
 
-Looking to do some Rust development on Tessel? You’ve found the right place. This repo hosts the Tessel library that provides the hardware API (`gpio.high()`, `spi.transfer()`, etc.) to user applications. It is currently incomplete but being actively worked on. We'd love your help to reach feature parity with the [JavaScript API](https://tessel.io/docs/hardwareAPI)!
+**This is a work in progress!** Please see [issue #45](https://github.com/tessel/tessel-rust/issues/45) for seamless Rust cross-compilation support on Tessel. The below instructions will continue to work in the meantime.
 
-**Get in touch**: the team working on Rust for Tessel is all on the #rust-lang channel of the [Tessel Slack ![](https://tessel-slack.herokuapp.com/badge.svg)](https://tessel-slack.herokuapp.com/). Join the conversation!
+This repo hosts instructions about using Rust on Tessel. The `tessel` crate provides the Tessel hardware API (`gpio.high()`, `spi.transfer()`, etc.) to user applications. Not all features are complete but these are actively worked on. We'd love your help to reach feature parity with the [JavaScript API](https://tessel.io/docs/hardwareAPI).
+
+The team working on Rust for Tessel is all on the #rust-lang channel of the [Tessel Slack ![](https://tessel-slack.herokuapp.com/badge.svg)](https://tessel-slack.herokuapp.com/). Join the conversation!
 
 **Documentation:**
 
@@ -32,7 +34,7 @@ The CLI will cross-compile your code on our compilation server, then serve the b
 ## Tessel Standard Library
 
 The **Tessel Standard Library** is the library that gets 'loaded' into a user program (runs on T2) and presents an API for configuring the hardware (LEDs, module ports, network interfaces, etc.).
-You can see the JavaScript version of the Tessel Standard Library [here](https://github.com/tessel/t2-firmware/blob/master/node/tessel-export.js). The most important function is communication with module ports which takes places by writing to a Unix Domain Socket always running on OpenWRT. See [the technical overview](https://github.com/tessel/onboarding/blob/master/T2-TECHNICAL-OVERVIEW.md) or previously linked JS Standard Library for more detailed information on how that works. Everything sent to the domain socket gets sent to the microcontroller. There is a simple protocol between the MediaTek (running OpenWRT) and the coprocessor to coordinate hardware operations.
+You can see the JavaScript version of the Tessel Standard Library [here](https://github.com/tessel/t2-firmware/blob/master/node/tessel-export.js). The most important function is communication with module ports which takes places by writing to a Unix Domain Socket always running on OpenWRT. See [the technical overview](https://github.com/tessel/t2-docs/blob/master/Debugging/Technical_Overview.md) or previously linked JS Standard Library for more detailed information on how that works. Everything sent to the domain socket gets sent to the microcontroller. There is a simple protocol between the MediaTek (running OpenWRT) and the coprocessor to coordinate hardware operations.
 
 Every **Tessel (hardware)** Module has a corresponding software module with the driver code that calls the Standard Library API. The module is managed and installed via a package manager (ie `npm` for Node and `cargo` for Rust). You can see an example of a [JS implementation of our accelerometer module](http://github.com/tessel/accel-mma84). Every hardware module we've made will require its library be ported to Rust and published on crates.io.
 
@@ -125,11 +127,11 @@ Not in any particular order:
 - [x] Review the CLI branch code
 - [ ] Figure out how to use `rustup` with Tessel on Windows
 - [ ] Integrate local deployment with `rustup` into the CLI
-- [ ] Start writing a Tessel CLI core library in Rust
-- [ ] Build out the Tessel Standard Library to allow use of the module ports
+- [x] Start writing a Tessel CLI core library in Rust
+- [x] Build out the Tessel Standard Library to allow use of the module ports
 - [ ] Figure out how to store the Tessel Standard Library permanently in memory on T2
-- [ ] Release the standard library on Crates.io when it's ready
-- [ ] Start porting each of the module libraries from JavaScript to Rust (dependent on building out the standard library for Rust)
+- [x] Release the standard library on Crates.io when it's ready
+- [x] Start porting each of the module libraries from JavaScript to Rust (dependent on building out the standard library for Rust)
 - [ ] Write [documentation for Rust usage](https://www.github.com/tessel/docs) on Tessel 2
 
 ## License
