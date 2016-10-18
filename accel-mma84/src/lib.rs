@@ -78,7 +78,7 @@ impl<'a> Accelerometer<'a> {
         }
 
         try!(self.set_scale_range(ScaleRange::Scale2G));
-        try!(self.set_sample_rate(SampleRate::Rate100));
+        try!(self.set_sample_rate(SampleRate::Rate6_25));
 
         Ok(())
     }
