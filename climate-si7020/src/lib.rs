@@ -18,6 +18,11 @@ enum Command {
     ReadId4 = 0xC9,
 }
 
+pub enum TemperatureUnit {
+    Celsius,
+    Fahrenheit
+}
+
 const TEMPERATURE_OFFSET: f64 = 46.85;
 const TEMPERATURE_SLOPE: f64 = 175.72/65536.0;
 const HUMIDITY_OFFSET: f64 = 6.0;
@@ -71,15 +76,17 @@ impl<'a> Climate<'a> {
         Ok(())
     }
 
-    pub fn read_temperature(&mut self) -> io::Result<f64> {
+    pub fn read_temperature(&mut self, unit: TemperatureUnit) -> io::Result<f64> {
         let mut buf = [0; 2];
         try!(self.read(&[Command::TempHold], &mut buf));
 
         let raw_temp = ((buf[0] as u16) << 8) + (buf[1] as u16);
         let mut temp = ((raw_temp as f64) * TEMPERATURE_SLOPE) - TEMPERATURE_OFFSET;
 
-        // Convert to fahrenheit.
-        temp = (temp * (9.0/5.0)) + 32.0;
+        match unit {
+            TemperatureUnit::Celsius => (),
+            TemperatureUnit::Fahrenheit => temp = temp * (9.0/5.0) + 32.0,
+        }
 
         Ok(temp)
     }
