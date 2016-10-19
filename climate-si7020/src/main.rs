@@ -1,7 +1,7 @@
 extern crate climate_si7020;
 extern crate tessel;
 
-use climate_si7020::Climate;
+use climate_si7020::{Climate, TemperatureUnit};
 use tessel::Tessel;
 use std::thread::sleep;
 use std::time::Duration;
@@ -16,7 +16,7 @@ fn main() {
 
     println!("Reading climate sensor... (Press CTRL + C to stop)");
     loop {
-        println!("Temperature (Fahrenheit): {:?}", climate.read_temperature());
+        println!("Temperature (Fahrenheit): {:?}", climate.read_temperature(TemperatureUnit::Fahrenheit));
 
         // Continue the loop after sleeping for 100ms.
         sleep(Duration::from_millis(100));
