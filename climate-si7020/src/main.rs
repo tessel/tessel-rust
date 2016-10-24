@@ -17,7 +17,7 @@ fn main() {
     println!("Reading climate sensor... (Press CTRL + C to stop)");
     loop {
         println!("Temperature (Fahrenheit): {:?}", climate.read_temperature());
-
+        println!("Humidity: {:?}", climate.read_humidity());
         // Continue the loop after sleeping for 100ms.
         sleep(Duration::from_millis(100));
     }
