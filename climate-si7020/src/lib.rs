@@ -11,7 +11,7 @@ use std::time::Duration;
 #[derive(Copy, Clone)]
 enum Command {
     TempHold = 0xE3,
-
+    RHHold = 0xE5,
     ReadId1 = 0xFA,
     ReadId2 = 0x0F,
     ReadId3 = 0xFC,
@@ -82,5 +82,15 @@ impl<'a> Climate<'a> {
         temp = (temp * (9.0/5.0)) + 32.0;
 
         Ok(temp)
+    }
+
+    pub fn read_humidity(&mut self) -> io::Result<f64> {
+        let mut buf = [0; 2];
+        try!(self.read(&[Command::RHHold], &mut buf));
+
+        let raw_humidity = ((buf[0] as u16) << 8) + (buf[1] as u16);
+        let humidity = ((raw_humidity as f64) * HUMIDITY_SLOPE) - HUMIDITY_OFFSET;
+
+        Ok(humidity)
     }
 }
