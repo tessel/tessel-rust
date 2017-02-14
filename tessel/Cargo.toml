@@ -9,6 +9,9 @@ authors = [
 	"Tim Ryan <tim@tessel.io>",
 ]
 description = "Runtime library for the Tessel microcontroller."
+documentation = "https://docs.rs/tessel/"
+repository = "https://github.com/tessel/tessel-rust"
+homepage = "https://tessel.io/"
 license = "MIT"
 
 [[bin]]
