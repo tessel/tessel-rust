@@ -319,7 +319,7 @@ impl<'p> I2cPort<'p> {
         // TODO: this is not how async reads should be handled.
         // Read in first byte.
         let mut read_byte = [0];
-        sock.read_exact(&mut read_byte);
+        sock.read_exact(&mut read_byte)?;
         assert_eq!(read_byte[0], reply::DATA.0);
         // Read in data from the socket
         sock.read_exact(read_buf)
