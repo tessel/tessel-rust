@@ -57,13 +57,13 @@ impl<'a> Accelerometer<'a> {
 
     fn read_register(&mut self, cmd: Command) -> io::Result<u8> {
         let mut xr: [u8; 1] = [0; 1];
-        try!(self.read_registers(cmd, &mut xr));
+        self.read_registers(cmd, &mut xr)?;
         Ok(xr[0])
     }
 
     /// Reads sequential buffers.
     fn read_registers(&mut self, cmd: Command, buf: &mut [u8]) -> io::Result<()> {
-        try!(self.i2c.transfer(I2C_ID, &[cmd as u8], buf));
+        self.i2c.transfer(I2C_ID, &[cmd as u8], buf)?;
         Ok(())
     }
 
@@ -73,52 +73,55 @@ impl<'a> Accelerometer<'a> {
     }
 
     pub fn connect(&mut self) -> io::Result<()> {
-        if try!(self.read_register(Command::WhoAmI)) != 0x2A {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid connection code."))
+        if self.read_register(Command::WhoAmI)? != 0x2A {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Invalid connection code.",
+            ));
         }
 
-        try!(self.set_scale_range(ScaleRange::Scale2G));
-        try!(self.set_sample_rate(SampleRate::Rate100));
+        self.set_scale_range(ScaleRange::Scale2G)?;
+        self.set_sample_rate(SampleRate::Rate100)?;
 
         Ok(())
     }
 
     fn standby_enable(&mut self) -> io::Result<()> {
         // Sets the MMA8452 to standby mode.
-        let value = try!(self.read_register(Command::CtrlReg1));
+        let value = self.read_register(Command::CtrlReg1)?;
         self.write_register(Command::CtrlReg1, value & !(0x01u8))
     }
 
     fn standby_disable(&mut self) -> io::Result<()> {
         // Sets the MMA8452 to active mode.
-        let value = try!(self.read_register(Command::CtrlReg1));
+        let value = self.read_register(Command::CtrlReg1)?;
         self.write_register(Command::CtrlReg1, value | (0x01u8))
     }
 
     pub fn set_scale_range(&mut self, range: ScaleRange) -> io::Result<()> {
-        try!(self.standby_enable());
-        try!(self.write_register(Command::XyzDataCfg, range as u8));
-        try!(self.standby_disable());
+        self.standby_enable()?;
+        self.write_register(Command::XyzDataCfg, range as u8)?;
+        self.standby_disable()?;
 
         Ok(())
     }
 
     pub fn set_sample_rate(&mut self, rate: SampleRate) -> io::Result<()> {
-        try!(self.standby_enable());
+        self.standby_enable()?;
 
         // Clear the three bits of output rate control (0b11000111 = 199)
-        let mut value = try!(self.read_register(Command::CtrlReg1));
+        let mut value = self.read_register(Command::CtrlReg1)?;
         value &= 0b11000111;
-        try!(self.write_register(Command::CtrlReg1, value | ((rate as u8) << 3)));
+        self.write_register(Command::CtrlReg1, value | ((rate as u8) << 3))?;
 
-        try!(self.standby_disable());
+        self.standby_disable()?;
 
         Ok(())
     }
 
     pub fn read_acceleration(&mut self) -> io::Result<(f64, f64, f64)> {
         let mut buf = [0; 6];
-        try!(self.read_registers(Command::OutXMsb, &mut buf));
+        self.read_registers(Command::OutXMsb, &mut buf)?;
 
         let mut out = vec![0.0, 0.0, 0.0];
 

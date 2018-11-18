@@ -2,9 +2,9 @@ extern crate accel_mma84;
 extern crate tessel;
 
 use accel_mma84::Accelerometer;
-use tessel::Tessel;
 use std::thread::sleep;
 use std::time::Duration;
+use tessel::Tessel;
 
 fn main() {
     // Acquire port A.

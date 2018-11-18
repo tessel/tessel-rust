@@ -2,9 +2,9 @@ extern crate climate_si7020;
 extern crate tessel;
 
 use climate_si7020::Climate;
-use tessel::Tessel;
 use std::thread::sleep;
 use std::time::Duration;
+use tessel::Tessel;
 
 fn main() {
     // Acquire port A.
@@ -12,7 +12,9 @@ fn main() {
 
     // Create the accelerometer object and connect to the sensor.
     let mut climate = Climate::new(port_a);
-    climate.connect().expect("Could not connect to climate sensor.");
+    climate
+        .connect()
+        .expect("Could not connect to climate sensor.");
 
     println!("Reading climate sensor... (Press CTRL + C to stop)");
     loop {

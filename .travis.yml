@@ -1,33 +1,18 @@
 language: rust
 rust:
+  - stable
+  - beta
   - nightly
 
+os:
+  - linux
+  - osx
+
 script:
-  - cd tessel
   - cargo build
   - cargo test
   - cargo doc
 
-  - cd ../accel-mma84
-  - cargo build
-  - cargo test
-  - cargo doc
-
-  - cd ../climate-si7020
-  - cargo build
-  - cargo test
-  - cargo doc
-
-  - cd ../relay-mono
-  - cargo build
-  - cargo test
-  - cargo doc
-
-  - cd ../servo-pca9685
-  - cargo build
-  - cargo test
-  - cargo doc
-
-  - cd ../test
-  - cargo build
-  - cargo test
+matrix:
+  allow_failures:
+    - rust: nightly

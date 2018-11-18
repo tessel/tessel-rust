@@ -3,9 +3,9 @@
 extern crate tessel;
 
 use std::io;
+use std::ops::Range;
 use std::thread;
 use std::time::Duration;
-use std::ops::Range;
 
 pub struct RelayArray<'a> {
     pin1: tessel::Pin<'a>,

@@ -16,10 +16,10 @@ name = "hello-rust"
 doc = false
 
 [dependencies]
-unix_socket = "0.5.0"
-lazy_static = "0.1"
+unix_socket = "0.5"
+lazy_static = "1.2"
 atomic-option = "0.1"
-bit-set = "0.4.0"
+bit-set = "0.5"
 
 [dev-dependencies]
 tempfile = "2.1.4"
