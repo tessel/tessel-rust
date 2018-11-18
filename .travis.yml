@@ -1,5 +1,7 @@
 language: rust
 rust:
+  - stable
+  - beta
   - nightly
 
 os:
@@ -11,3 +13,7 @@ script:
   - cargo build
   - cargo test
   - cargo doc
+
+matrix:
+  allow_failures:
+    - rust: nightly
