@@ -52,20 +52,39 @@ pub enum Command<'a> {
     GpioPull(u8),
     AnalogRead(u8),
 
-    AnalogWrite{ pin: u8, value: u8 },
+    AnalogWrite {
+        pin: u8,
+        value: u8,
+    },
 
-    EnableSpi{ mode: u8, freq: u8, div: u8 },
+    EnableSpi {
+        mode: u8,
+        freq: u8,
+        div: u8,
+    },
     DisableSpi,
-    EnableI2c{ baud: u8 },
+    EnableI2c {
+        baud: u8,
+    },
     DisableI2c,
-    EnableUart{ baud: u8, mode: u8 },
+    EnableUart {
+        baud: u8,
+        mode: u8,
+    },
     DisableUart,
 
     Start(u8),
     Stop,
 
-    PwmDutyCycle{ pin: u8, duty_cycle: u16 },
-    PwmPeriod{ prescalar: u8, tcc_id: u8, period: u16 },
+    PwmDutyCycle {
+        pin: u8,
+        duty_cycle: u16,
+    },
+    PwmPeriod {
+        prescalar: u8,
+        tcc_id: u8,
+        period: u16,
+    },
 
     Rx(u8),
     Echo(&'a [u8]),
@@ -103,7 +122,7 @@ impl PortSocket {
 
         PortSocket {
             _socket_path: path.to_string(),
-            socket: socket
+            socket: socket,
         }
     }
 
@@ -121,7 +140,7 @@ impl PortSocket {
                 assert!(data.len() <= u8::max_value() as usize);
                 try!(socket.write_all(&[raw_cmd::ECHO, data.len() as u8]));
                 socket.write_all(data)
-            },
+            }
             Tx(data) => {
                 for slice in data.chunks(u8::max_value() as usize) {
                     try!(socket.write_all(&[raw_cmd::TX, slice.len() as u8]));
@@ -146,20 +165,36 @@ impl PortSocket {
             GpioPull(pin) => socket.write_all(&[raw_cmd::GPIO_PULL, pin]),
             AnalogRead(pin) => socket.write_all(&[raw_cmd::ANALOG_READ, pin]),
 
-            AnalogWrite{ pin, value } => socket.write_all(&[raw_cmd::ANALOG_WRITE, pin, value]),
+            AnalogWrite { pin, value } => socket.write_all(&[raw_cmd::ANALOG_WRITE, pin, value]),
 
-            EnableSpi{ mode, freq, div } => socket.write_all(&[raw_cmd::ENABLE_SPI, mode, freq, div]),
+            EnableSpi { mode, freq, div } => {
+                socket.write_all(&[raw_cmd::ENABLE_SPI, mode, freq, div])
+            }
             DisableSpi => socket.write_all(&[raw_cmd::DISABLE_SPI]),
-            EnableI2c{ baud } => socket.write_all(&[raw_cmd::ENABLE_I2C, baud]),
+            EnableI2c { baud } => socket.write_all(&[raw_cmd::ENABLE_I2C, baud]),
             DisableI2c => socket.write_all(&[raw_cmd::DISABLE_I2C]),
-            EnableUart{ baud, mode } => socket.write_all(&[raw_cmd::ENABLE_UART, baud, mode]),
+            EnableUart { baud, mode } => socket.write_all(&[raw_cmd::ENABLE_UART, baud, mode]),
             DisableUart => socket.write_all(&[raw_cmd::DISABLE_UART]),
 
             Start(addr) => socket.write_all(&[raw_cmd::START, addr]),
             Stop => socket.write_all(&[raw_cmd::STOP]),
 
-            PwmDutyCycle{ pin, duty_cycle } => socket.write_all(&[raw_cmd::PWM_DUTY_CYCLE, pin, (duty_cycle >> 8) as u8, (duty_cycle & 0xFF) as u8]),
-            PwmPeriod{ prescalar, tcc_id, period } => socket.write_all(&[raw_cmd::PWM_PERIOD, prescalar << 4 | tcc_id & 0x7, (period >> 8) as u8, (period & 0xf) as u8]),
+            PwmDutyCycle { pin, duty_cycle } => socket.write_all(&[
+                raw_cmd::PWM_DUTY_CYCLE,
+                pin,
+                (duty_cycle >> 8) as u8,
+                (duty_cycle & 0xFF) as u8,
+            ]),
+            PwmPeriod {
+                prescalar,
+                tcc_id,
+                period,
+            } => socket.write_all(&[
+                raw_cmd::PWM_PERIOD,
+                prescalar << 4 | tcc_id & 0x7,
+                (period >> 8) as u8,
+                (period & 0xf) as u8,
+            ]),
         }
     }
 

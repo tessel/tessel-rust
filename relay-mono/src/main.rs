@@ -5,9 +5,9 @@ extern crate relay_mono;
 extern crate tessel;
 
 use relay_mono::RelayArray;
-use tessel::Tessel;
 use std::thread::sleep;
 use std::time::Duration;
+use tessel::Tessel;
 
 fn main() {
     // Acquire port A.

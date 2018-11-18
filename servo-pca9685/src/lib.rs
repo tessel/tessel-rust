@@ -3,9 +3,9 @@
 extern crate tessel;
 
 use std::io;
+use std::ops::Range;
 use std::thread;
 use std::time::Duration;
-use std::ops::Range;
 
 #[repr(u8)]
 #[allow(dead_code)]
@@ -90,11 +90,14 @@ impl<'a> ServoArray<'a> {
         let prescale: u8 = (((25000000 / (MAX as u64)) / frequency) - 1) as u8;
 
         let mut buf = [0; 1];
-        self.i2c.transfer(self.i2c_id, &[Command::MODE1 as u8], &mut buf);
+        self.i2c
+            .transfer(self.i2c_id, &[Command::MODE1 as u8], &mut buf);
         let mode = buf[0];
 
-        self.i2c.send(self.i2c_id, &[Command::MODE1 as u8, mode | 0x10]);
-        self.i2c.send(self.i2c_id, &[Command::PRESCALE as u8, prescale]);
+        self.i2c
+            .send(self.i2c_id, &[Command::MODE1 as u8, mode | 0x10]);
+        self.i2c
+            .send(self.i2c_id, &[Command::PRESCALE as u8, prescale]);
         self.i2c.send(self.i2c_id, &[Command::MODE1 as u8, mode]);
         self.i2c.send(self.i2c_id, &[Command::MODE1 as u8, 0xA1]);
     }
@@ -103,10 +106,25 @@ impl<'a> ServoArray<'a> {
     pub fn set_duty_cycle(&mut self, i: usize, value: f64) {
         let offset = ((i - 1) * 4) as u8;
         let reg = (((MAX - 1) as f64) * f64::max(f64::min(value, 1.0), 0.0)) as u16;
-        println!("0 0 {:?} {:?}", (reg & 0xFF) as u8, ((reg >> 8) & 0xFF) as u8);
-        self.i2c.send(self.i2c_id, &[Command::LED0_ON_L as u8 + offset, 0]);
-        self.i2c.send(self.i2c_id, &[Command::LED0_ON_H as u8 + offset, 0]);
-        self.i2c.send(self.i2c_id, &[Command::LED0_OFF_L as u8 + offset, (reg & 0xFF) as u8]);
-        self.i2c.send(self.i2c_id, &[Command::LED0_OFF_H as u8 + offset, ((reg >> 8) & 0xFF) as u8]);
+        println!(
+            "0 0 {:?} {:?}",
+            (reg & 0xFF) as u8,
+            ((reg >> 8) & 0xFF) as u8
+        );
+        self.i2c
+            .send(self.i2c_id, &[Command::LED0_ON_L as u8 + offset, 0]);
+        self.i2c
+            .send(self.i2c_id, &[Command::LED0_ON_H as u8 + offset, 0]);
+        self.i2c.send(
+            self.i2c_id,
+            &[Command::LED0_OFF_L as u8 + offset, (reg & 0xFF) as u8],
+        );
+        self.i2c.send(
+            self.i2c_id,
+            &[
+                Command::LED0_OFF_H as u8 + offset,
+                ((reg >> 8) & 0xFF) as u8,
+            ],
+        );
     }
 }

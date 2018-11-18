@@ -1,10 +1,9 @@
 /// A blinky example for Tessel
-
 extern crate tessel;
 
-use tessel::Tessel;
 use std::thread::sleep;
 use std::time::Duration;
+use tessel::Tessel;
 
 fn main() {
     // Create a new Tessel

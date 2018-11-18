@@ -2,9 +2,9 @@ extern crate servo_pca9685;
 extern crate tessel;
 
 use servo_pca9685::ServoArray;
-use tessel::Tessel;
 use std::thread::sleep;
 use std::time::Duration;
+use tessel::Tessel;
 
 fn main() {
     // Acquire port A.

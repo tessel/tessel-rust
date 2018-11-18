@@ -1,24 +1,24 @@
 //! Tessel API and crate.
 
-#[macro_use] extern crate lazy_static;
+#[macro_use]
+extern crate lazy_static;
 extern crate atomic_option;
-extern crate unix_socket;
 extern crate bit_set;
+extern crate unix_socket;
 
 pub mod protocol;
 
 use atomic_option::AtomicOption;
-use protocol::{Command, reply, PortSocket};
+use bit_set::BitSet;
+use protocol::{reply, Command, PortSocket};
 use std::fs::File;
 use std::io;
 use std::io::prelude::*;
 use std::marker::PhantomData;
 use std::sync::atomic::Ordering;
-use bit_set::BitSet;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 // TODO Corking reduces latency, as spid adds overhead for each packet
-
 
 // Paths to the SPI daemon sockets with incoming data from coprocessor.
 const PORT_A_UDS_PATH: &'static str = "/var/run/tessel/port_a";
@@ -105,7 +105,10 @@ impl Port {
         for i in 2..8 {
             available.insert(i);
         }
-        (I2cPort::new(self.socket.clone()), Gpio::new(self.socket.clone(), available))
+        (
+            I2cPort::new(self.socket.clone()),
+            Gpio::new(self.socket.clone(), available),
+        )
     }
 }
 
@@ -168,7 +171,11 @@ impl<'a> PinSelect<'a> for (usize, usize, usize) {
         set.contains(self.0) || set.contains(self.1) || set.contains(self.2)
     }
     fn select<'b>(&self, socket: Arc<Mutex<PortSocket>>) -> Self::Output {
-        (Pin::new(self.0, socket.clone()), Pin::new(self.1, socket.clone()), Pin::new(self.2, socket))
+        (
+            Pin::new(self.0, socket.clone()),
+            Pin::new(self.1, socket.clone()),
+            Pin::new(self.2, socket),
+        )
     }
 }
 
@@ -232,8 +239,8 @@ impl<'p> I2cPort<'p> {
         let mut intermediate: f64 = MCU_MAX_SPEED as f64 / frequency as f64;
         intermediate = intermediate - MCU_MAX_SPEED as f64 * MCU_MAX_SCL_RISE_TIME_NS;
         // TODO: Do not hardcode these numbers
-        intermediate = intermediate / MCU_MAGIC_DIV_FACTOR_FOR_I2C_BAUD as f64 -
-                       MCU_MAGIC_SUBTRACT_FACTOR_FOR_I2C_BAUD as f64;
+        intermediate = intermediate / MCU_MAGIC_DIV_FACTOR_FOR_I2C_BAUD as f64
+            - MCU_MAGIC_SUBTRACT_FACTOR_FOR_I2C_BAUD as f64;
 
         // Return either the intermediate value or 255
         let low = intermediate.min(u8::max_value() as f64);
@@ -251,19 +258,22 @@ impl<'p> I2cPort<'p> {
 
     fn enable(&mut self, baud: u8) {
         let mut sock = self.socket.lock().unwrap();
-        sock.write_command(Command::EnableI2c { baud: baud }).unwrap();
+        sock.write_command(Command::EnableI2c { baud: baud })
+            .unwrap();
     }
 
     fn tx(sock: &mut MutexGuard<PortSocket>, address: u8, write_buf: &[u8]) {
-        sock.write_command(Command::Start(address<<1)).unwrap();
+        sock.write_command(Command::Start(address << 1)).unwrap();
         // Write the command and data
         sock.write_command(Command::Tx(write_buf)).unwrap();
     }
 
     fn rx(sock: &mut MutexGuard<PortSocket>, address: u8, read_buf: &mut [u8]) {
-        sock.write_command(Command::Start(address << 1 | 1)).unwrap();
+        sock.write_command(Command::Start(address << 1 | 1))
+            .unwrap();
         // Write the command and transfer length
-        sock.write_command(Command::Rx(read_buf.len() as u8)).unwrap();
+        sock.write_command(Command::Rx(read_buf.len() as u8))
+            .unwrap();
     }
 
     fn stop(sock: &mut MutexGuard<PortSocket>) {
@@ -289,13 +299,18 @@ impl<'p> I2cPort<'p> {
         // TODO: this is not how async reads should be handled.
         // Read in first byte.
         let mut read_byte = [0];
-        try!(sock.read_exact(&mut read_byte));
+        sock.read_exact(&mut read_byte)?;
         assert_eq!(read_byte[0], reply::DATA.0);
         // Read in data from the socket
-        return sock.read_exact(read_buf);
+        sock.read_exact(read_buf)
     }
 
-    pub fn transfer(&mut self, address: u8, write_buf: &[u8], read_buf: &mut [u8]) -> io::Result<()> {
+    pub fn transfer(
+        &mut self,
+        address: u8,
+        write_buf: &[u8],
+        read_buf: &mut [u8],
+    ) -> io::Result<()> {
         let mut sock = self.socket.lock().unwrap();
         I2cPort::tx(&mut sock, address, write_buf);
         I2cPort::rx(&mut sock, address, read_buf);
@@ -304,10 +319,10 @@ impl<'p> I2cPort<'p> {
         // TODO: this is not how async reads should be handled.
         // Read in first byte.
         let mut read_byte = [0];
-        try!(sock.read_exact(&mut read_byte));
+        sock.read_exact(&mut read_byte);
         assert_eq!(read_byte[0], reply::DATA.0);
         // Read in data from the socket
-        return sock.read_exact(read_buf);
+        sock.read_exact(read_buf)
     }
 }
 
@@ -332,14 +347,14 @@ pub struct LED {
 
 impl LED {
     pub fn new(color: &'static str, kind: &'static str) -> LED {
-        let path = format!("/sys/devices/leds/leds/tessel:{}:{}/brightness",
-                           color,
-                           kind);
+        let path = format!(
+            "/sys/devices/leds/leds/tessel:{}:{}/brightness",
+            color, kind
+        );
 
         // Open the file for write operations.
         LED::new_with_file(File::create(path).unwrap())
     }
-
 
     fn new_with_file(file: File) -> LED {
         let mut led = LED {

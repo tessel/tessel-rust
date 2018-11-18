@@ -19,9 +19,9 @@ enum Command {
 }
 
 const TEMPERATURE_OFFSET: f64 = 46.85;
-const TEMPERATURE_SLOPE: f64 = 175.72/65536.0;
+const TEMPERATURE_SLOPE: f64 = 175.72 / 65536.0;
 const HUMIDITY_OFFSET: f64 = 6.0;
-const HUMIDITY_SLOPE: f64 = 125.0/65536.0;
+const HUMIDITY_SLOPE: f64 = 125.0 / 65536.0;
 
 const I2C_ID: u8 = 0x40;
 
@@ -47,7 +47,7 @@ impl<'a> Climate<'a> {
     /// Reads sequential buffers.
     fn read(&mut self, values: &[Command], buf: &mut [u8]) -> io::Result<()> {
         let a: Vec<u8> = values.iter().map(|x| *x as u8).collect();
-        try!(self.i2c.transfer(I2C_ID, &a, buf));
+        self.i2c.transfer(I2C_ID, &a, buf)?;
         Ok(())
     }
 
@@ -62,24 +62,27 @@ impl<'a> Climate<'a> {
         let mut buf = [0; 6];
         thread::sleep(Duration::from_millis(30)); //WAKE_UP_TIME
         println!("hi");
-        try!(self.read(&[Command::ReadId3, Command::ReadId4], &mut buf));
+        self.read(&[Command::ReadId3, Command::ReadId4], &mut buf)?;
         println!("hey");
         println!("hi {:?}", buf);
         if buf[0] != 0x14 {
-            return Err(io::Error::new(io::ErrorKind::InvalidData, "Invalid connection code."))
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Invalid connection code.",
+            ));
         }
         Ok(())
     }
 
     pub fn read_temperature(&mut self) -> io::Result<f64> {
         let mut buf = [0; 2];
-        try!(self.read(&[Command::TempHold], &mut buf));
+        self.read(&[Command::TempHold], &mut buf)?;
 
         let raw_temp = ((buf[0] as u16) << 8) + (buf[1] as u16);
         let mut temp = ((raw_temp as f64) * TEMPERATURE_SLOPE) - TEMPERATURE_OFFSET;
 
         // Convert to fahrenheit.
-        temp = (temp * (9.0/5.0)) + 32.0;
+        temp = (temp * (9.0 / 5.0)) + 32.0;
 
         Ok(temp)
     }
